@@ -17,7 +17,7 @@ void strupp(char *beg)
         *beg = toupper(*beg), beg++;
 }
 
-static int write_message(int ConnectFD, const char *msg)
+int write_message(int ConnectFD, const char *msg)
 {
     write(ConnectFD, msg, strlen(msg));
     return 1;
@@ -27,15 +27,15 @@ static int parse_request(char *buffer, struct ConnectionData *connect)
 {
     // assume buffer endswith \r\n
     char *space_ptr = strchr(buffer, (int)' ');
-    if (!space_ptr)
+    int space_pos = -1;
+    if (space_ptr)
     {
-        return -1;
+        space_pos = space_ptr - buffer;
     }
 
-    int space_pos = space_ptr - buffer;
     int buffer_len = strlen(buffer);
     buffer[buffer_len - 2] = '\0';
-    if (space_pos)
+    if (space_pos != -1)
     {
         buffer[space_pos] = '\0';
         connect->verb = buffer;
@@ -66,29 +66,48 @@ void *connection(void *arg)
     memset(&connect, 0, sizeof(connect));
     connect.ConnectFD = ConnectFD;
 
-    char buffer[BUFFER_SIZE];
+    char buffer[BUFFER_SIZE + 1];
 
-    write_message(ConnectFD, CONNECT_OK_MSG);
+    write_message(ConnectFD, MSG_220_CONNECT_OK);
     for (;;)
     {
+        // TODO: multi segment (\r\n)
         int len = read(ConnectFD, buffer, BUFFER_SIZE);
+        buffer[len] = '\0';
+        // for (int i = 0; i < len; i++)
+        // {
+        //     printf("%d ", (int)buffer[i]);
+        // }
+        // printf("\n");
         if (len == 0)
         {
             break;
         }
         // TODO: check buffer endswith \r\n
         connect.verb_idx = parse_request(buffer, &connect);
+        
+        printf("%d\n%s\n%s\n", connect.verb_idx, connect.verb, connect.param);
+
         if (connect.verb_idx == -1)
         {
             perror("invalid verb");
             break;
         }
+        if (VERB_REQUIRE_PARAM[connect.verb_idx] && !connect.param)
+        {
+            // TODO: print specific verb
+            perror("request need a parameter");
+            break;
+        }
 
-        printf("%d\n%s\n%s\n", connect.verb_idx, connect.verb, connect.param);
         VERB_FUNCS[connect.verb_idx](&connect);
+
+        if (!strcmp(connect.verb, "QUIT"))
+        {
+            break;
+        }
     }
 
-end:
     close(ConnectFD);
     return 0;
 }

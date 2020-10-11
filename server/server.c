@@ -39,6 +39,9 @@ int main(void)
     sa.sin_port = htons(FTP_SERVER_PORT);
     sa.sin_addr.s_addr = htonl(INADDR_ANY);
 
+    int reuse = 1;
+    setsockopt(SocketFD, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof reuse);
+
     if (bind(SocketFD, (struct sockaddr *)&sa, sizeof sa) == -1)
     {
         perror("bind failed");
