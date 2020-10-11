@@ -13,6 +13,7 @@
 #include <pthread.h>
 
 #include "connection.h"
+#include "const.h"
 
 int SocketFD;
 
@@ -35,7 +36,7 @@ int main(void)
     memset(&sa, 0, sizeof sa);
 
     sa.sin_family = AF_INET;
-    sa.sin_port = htons(21);
+    sa.sin_port = htons(FTP_SERVER_PORT);
     sa.sin_addr.s_addr = htonl(INADDR_ANY);
 
     if (bind(SocketFD, (struct sockaddr *)&sa, sizeof sa) == -1)
