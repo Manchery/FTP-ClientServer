@@ -65,6 +65,7 @@ void *connection(void *arg)
     struct ConnectionData connect;
     memset(&connect, 0, sizeof(connect));
     connect.ConnectFD = ConnectFD;
+    strcpy(connect.current_path, "/");
 
     char buffer[BUFFER_SIZE + 1];
 
