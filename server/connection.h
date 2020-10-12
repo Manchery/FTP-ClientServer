@@ -36,6 +36,8 @@ struct ConnectionData{
 
     enum RNFRState RNFR_state;
     char RNFR_target[BUFFER_SIZE];
+
+    int rest_position;
 };
 
 int write_message(int ConnectFD, const char *msg);

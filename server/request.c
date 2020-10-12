@@ -260,7 +260,12 @@ static void close_data_connection(struct ConnectionData *connect)
 static void send_file(const char *filename, struct ConnectionData *connect)
 {
     int FD = open(filename, O_RDONLY);
-    // TODO: rest position
+    
+    if (connect->rest_position){
+        lseek(FD, connect->rest_position, SEEK_SET);
+        connect->rest_position = 0;
+    }
+
     char buffer[BUFFER_SIZE];
     for (;;)
     {
@@ -274,8 +279,16 @@ static void send_file(const char *filename, struct ConnectionData *connect)
 
 static void recv_file(const char *filename, struct ConnectionData *connect)
 {
-    int FD = open(filename, O_WRONLY | O_CREAT, S_IRWXU | S_IRWXG | S_IRWXO);
-    // TODO: rest position
+    int FD = 0;
+    if (connect->rest_position){
+        FD = open(filename, O_WRONLY | O_APPEND, S_IRWXU | S_IRWXG | S_IRWXO);
+        lseek(FD, connect->rest_position, SEEK_SET);
+        connect->rest_position = 0;
+    }
+    else {
+        FD = open(filename, O_WRONLY | O_CREAT, S_IRWXU | S_IRWXG | S_IRWXO);
+    }
+
     char buffer[BUFFER_SIZE];
     for (;;)
     {
@@ -624,5 +637,17 @@ int REST(struct ConnectionData *connect)
 {
     if (!check_userstate(connect))
         return 0;
+
+    int tmp;
+    if (sscanf(connect->param, "%d", &tmp)){
+        connect->rest_position = tmp;
+        // TODO: message content
+        write_message(connect->ConnectFD, MSG_350_RNFR); 
+    }else{
+        char msg_buffer[MAX_MSG_LEN];
+        sprintf(msg_buffer, MSG_501_TEMPLATE, "Syntax error in parameters or arguments.");
+		write_message(connect->ConnectFD, msg_buffer);
+    }
+
     return 1;
 }

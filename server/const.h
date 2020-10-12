@@ -8,6 +8,8 @@
 
 #define MAX_MSG_LEN 512
 
+// TODO: move to .c file, make them static
+
 extern const char MSG_200_PORT_OK[];
 extern const char MSG_227_PASV_OK[];
 extern const char MSG_220_CONNECT_OK[];
