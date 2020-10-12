@@ -211,7 +211,7 @@ int PASV(struct ConnectionData *connect)
 
 static int open_data_connection(struct ConnectionData *_connect)
 {
-    if (_connect->data_mode == NONE)
+    if (_connect->data_mode == NONE_MODE)
     {
         write_message(_connect->ConnectFD, MSG_425_NO_DATA_CONN);
         return 0;
@@ -254,7 +254,7 @@ static void close_data_connection(struct ConnectionData *connect)
     {
         close(connect->dataConnectFD);
     }
-    connect->data_mode = NONE;
+    connect->data_mode = NONE_MODE;
 }
 
 static void send_file(const char *filename, struct ConnectionData *connect)
@@ -573,12 +573,51 @@ int RNFR(struct ConnectionData *connect)
 {
     if (!check_userstate(connect))
         return 0;
+
+    char virtual_path[BUFFER_SIZE], absolute_path[BUFFER_SIZE];
+    if (!get_absolute_path(virtual_path, absolute_path, connect, 0)){
+        return 0;
+    }
+
+    struct stat s = {0};
+    stat(absolute_path, &s);
+    if (!(s.st_mode & S_IFDIR) && !(s.st_mode & S_IFREG))
+    {
+        write_message(connect->ConnectFD, MSG_550_WRONG_PATH);
+        return 1;
+    }
+
+    connect->RNFR_state = RNFR_READY;
+    strcpy(connect->RNFR_target, absolute_path);
+    write_message(connect->ConnectFD, MSG_350_RNFR);
     return 1;
 }
 int RNTO(struct ConnectionData *connect)
 {
     if (!check_userstate(connect))
         return 0;
+
+    if (connect->RNFR_state != RNFR_READY){
+        write_message(connect->ConnectFD, MSG_503_RNTO_REQ_RNFR);
+        return 1;
+    }else{
+        connect->RNFR_state = NO_RNFR;
+    }
+
+    char virtual_path[BUFFER_SIZE], absolute_path[BUFFER_SIZE];
+    if (!get_absolute_path(virtual_path, absolute_path, connect, 0)){
+        return 0;
+    }
+
+    if (rename(connect->RNFR_target, absolute_path))
+	{
+		write_message(connect->ConnectFD, MSG_451_RNTO_ERR);
+	}
+	else
+	{
+		write_message(connect->ConnectFD, MSG_250_RNTO_SUCC);
+	}
+
     return 1;
 }
 int REST(struct ConnectionData *connect)

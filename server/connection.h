@@ -9,9 +9,14 @@ enum UserState {
 };
 
 enum DataMode{
-    NONE,
+    NONE_MODE,
     PORT_MODE,
     PASV_MODE
+};
+
+enum RNFRState{
+    NO_RNFR,
+    RNFR_READY
 };
 
 struct ConnectionData{
@@ -28,6 +33,9 @@ struct ConnectionData{
     int dataConnectFD;
 
     char current_path[BUFFER_SIZE];
+
+    enum RNFRState RNFR_state;
+    char RNFR_target[BUFFER_SIZE];
 };
 
 int write_message(int ConnectFD, const char *msg);

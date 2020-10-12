@@ -17,6 +17,11 @@ const char MSG_257_PWD[] = "257 \"%s\" is the current directory\r\n";
 const char MSG_250_CWD[] = "250 Directory changed to \"%s\".\r\n";
 const char MSG_257_MKD[] = "257 \"%s\" directory created.\r\n";
 const char MSG_250_RMD[] = "250 \"%s\" directory removed.\r\n";
+const char MSG_350_RNFR[] = "350 Requested file action pending further information.\r\n";
+
+const char MSG_503_RNTO_REQ_RNFR[] = "503 Bad sequence of commands.\r\n";
+const char MSG_451_RNTO_ERR[] = "451 Requested action aborted. Local error in processing.\r\n";
+const char MSG_250_RNTO_SUCC[] = "250 Rename successful.\r\n";
 
 const char MSG_200_TEMPLATE[] = "220 %s\r\n";
 const char MSG_504_TEMPLATE[] = "504 %s\r\n";
