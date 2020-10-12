@@ -2,20 +2,32 @@
 #include "utils.h"
 #include <string.h>
 
-static int startswith(const char *str, char *pattern)
+int startswith(const char *str, char *pattern)
 {
+    int n = strlen(str), m = strlen(pattern);
+    if (n < m)
+        return 0;
+    for (int i = 0; i < m; i++)
+        if (str[i] != pattern[i])
+            return 0;
     return 1;
 }
-static int endswith(const char *str, char *pattern)
+int endswith(const char *str, char *pattern)
 {
+    int n = strlen(str), m = strlen(pattern);
+    if (n < m)
+        return 0;
+    for (int i = 0; i < m; i++)
+        if (str[i] != pattern[n - m + i])
+            return 0;
     return 1;
 }
 
-static int startswith_char(const char *str, char c)
+int startswith_char(const char *str, char c)
 {
     return str[0] == c;
 }
-static int endswith_char(const char *str, char c)
+int endswith_char(const char *str, char c)
 {
     return str[strlen(str) - 1] == c;
 }
@@ -99,15 +111,14 @@ void show_file_info(char *output, char *filename, char *basename, struct stat *i
 
         mode_to_letters(info_p->st_mode, modestr); /*模式到字符的转换*/
 
-        sprintf(output, "%s%4d %-8s%-8s%8ld  %.12s %s\r\n", 
-            modestr, 
-            (int)info_p->st_nlink,
-            uid_to_name(info_p->st_uid),
-            gid_to_name(info_p->st_gid),
-            (long)info_p->st_size,
-            4 + ctime(&info_p->st_mtime),
-            basename
-        );
+        sprintf(output, "%s%4d %-8s%-8s%8ld  %.12s %s\r\n",
+                modestr,
+                (int)info_p->st_nlink,
+                uid_to_name(info_p->st_uid),
+                gid_to_name(info_p->st_gid),
+                (long)info_p->st_size,
+                4 + ctime(&info_p->st_mtime),
+                basename);
     }
 }
 
@@ -160,7 +171,6 @@ char *uid_to_name(uid_t uid)
     else
         return pw_ptr->pw_name; /*打印用户名*/
 }
-
 
 char *gid_to_name(gid_t gid)
 {

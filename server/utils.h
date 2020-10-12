@@ -9,6 +9,11 @@
 #include <pwd.h>
 #include <grp.h>
 
+int startswith(const char *str, char *pattern);
+int endswith(const char *str, char *pattern);
+int startswith_char(const char *str, char c);
+int endswith_char(const char *str, char c);
+
 int push_path(char *source, const char *target, int is_dir);
 
 void show_file_info(char *output, char *filename, char *basename, struct stat *info_p);

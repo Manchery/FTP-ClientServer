@@ -322,26 +322,35 @@ static int send_ls(const char *dirname, struct ConnectionData *connect)
     }
 }
 
+static int get_absolute_path(char *virtual_path, char *absolute_path, struct ConnectionData *connect, int is_dir){
+    // TODO: out of length
+    strcpy(virtual_path, connect->current_path);
+    if (connect->param){
+        if (!push_path(virtual_path, connect->param, is_dir))
+        {
+            write_message(connect->ConnectFD, MSG_550_WRONG_PATH);
+            return 0;
+        }
+    }
+
+    strcpy(absolute_path, ROOT_DIR);
+    if (!push_path(absolute_path, virtual_path + 1, is_dir))
+    {
+        write_message(connect->ConnectFD, MSG_550_WRONG_PATH);
+        return 0;
+    }
+
+    return 1;
+}
+
 int RETR(struct ConnectionData *connect)
 {
     if (!check_userstate(connect))
         return 0;
 
-    // TODO: out of size exception
-    char tmp[BUFFER_SIZE];
-    strcpy(tmp, connect->current_path);
-    if (!push_path(tmp, connect->param, 0))
-    {
-        write_message(connect->ConnectFD, MSG_550_WRONG_PATH);
-        return 1;
-    }
-
-    char absolute_path[BUFFER_SIZE];
-    strcpy(absolute_path, ROOT_DIR);
-    if (!push_path(absolute_path, tmp + 1, 0))
-    {
-        write_message(connect->ConnectFD, MSG_550_WRONG_PATH);
-        return 1;
+    char virtual_path[BUFFER_SIZE], absolute_path[BUFFER_SIZE];
+    if (!get_absolute_path(virtual_path, absolute_path, connect, 0)){
+        return 0;
     }
 
     struct stat s = {0};
@@ -373,20 +382,9 @@ int STOR(struct ConnectionData *connect)
     if (!check_userstate(connect))
         return 0;
 
-    char tmp[BUFFER_SIZE];
-    strcpy(tmp, connect->current_path);
-    if (!push_path(tmp, connect->param, 0))
-    {
-        write_message(connect->ConnectFD, MSG_550_WRONG_PATH);
-        return 1;
-    }
-
-    char absolute_path[BUFFER_SIZE];
-    strcpy(absolute_path, ROOT_DIR);
-    if (!push_path(absolute_path, tmp + 1, 0))
-    {
-        write_message(connect->ConnectFD, MSG_550_WRONG_PATH);
-        return 1;
+    char virtual_path[BUFFER_SIZE], absolute_path[BUFFER_SIZE];
+    if (!get_absolute_path(virtual_path, absolute_path, connect, 0)){
+        return 0;
     }
 
     write_message(connect->ConnectFD, MSG_150_DATA_CONN_READY);
@@ -445,21 +443,9 @@ int MKD(struct ConnectionData *connect)
     if (!check_userstate(connect))
         return 0;
 
-    // TODO: out of length
-    char tmp[BUFFER_SIZE];
-    strcpy(tmp, connect->current_path);
-    if (!push_path(tmp, connect->param, 1))
-    {
-        write_message(connect->ConnectFD, MSG_550_WRONG_PATH);
-        return 1;
-    }
-
-    char absolute_path[BUFFER_SIZE];
-    strcpy(absolute_path, ROOT_DIR);
-    if (!push_path(absolute_path, tmp + 1, 1))
-    {
-        write_message(connect->ConnectFD, MSG_550_WRONG_PATH);
-        return 1;
+    char virtual_path[BUFFER_SIZE], absolute_path[BUFFER_SIZE];
+    if (!get_absolute_path(virtual_path, absolute_path, connect, 1)){
+        return 0;
     }
 
     if (mkdir(absolute_path, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH))
@@ -470,7 +456,7 @@ int MKD(struct ConnectionData *connect)
     }
 
     char msg_buffer[MAX_MSG_LEN];
-    sprintf(msg_buffer, MSG_257_MKD, tmp);
+    sprintf(msg_buffer, MSG_257_MKD, virtual_path);
     write_message(connect->ConnectFD, msg_buffer);
     return 1;
 }
@@ -479,21 +465,9 @@ int CWD(struct ConnectionData *connect)
     if (!check_userstate(connect))
         return 0;
 
-    // TODO: out of length
-    char tmp[BUFFER_SIZE];
-    strcpy(tmp, connect->current_path);
-    if (!push_path(tmp, connect->param, 1))
-    {
-        write_message(connect->ConnectFD, MSG_550_WRONG_PATH);
-        return 1;
-    }
-
-    char absolute_path[BUFFER_SIZE];
-    strcpy(absolute_path, ROOT_DIR);
-    if (!push_path(absolute_path, tmp + 1, 1))
-    {
-        write_message(connect->ConnectFD, MSG_550_WRONG_PATH);
-        return 1;
+    char virtual_path[BUFFER_SIZE], absolute_path[BUFFER_SIZE];
+    if (!get_absolute_path(virtual_path, absolute_path, connect, 1)){
+        return 0;
     }
 
     struct stat s = {0};
@@ -504,7 +478,7 @@ int CWD(struct ConnectionData *connect)
         return 1;
     }
 
-    strcpy(connect->current_path, tmp);
+    strcpy(connect->current_path, virtual_path);
 
     char msg_buffer[MAX_MSG_LEN];
     sprintf(msg_buffer, MSG_250_CWD, connect->current_path);
@@ -526,24 +500,9 @@ int LIST(struct ConnectionData *connect)
     if (!check_userstate(connect))
         return 0;
 
-    // TODO: out of length
-    char tmp[BUFFER_SIZE];
-    strcpy(tmp, connect->current_path);
-    if (connect->param)
-    {
-        if (!push_path(tmp, connect->param, 1))
-        {
-            write_message(connect->ConnectFD, MSG_550_WRONG_PATH);
-            return 1;
-        }
-    }
-
-    char absolute_path[BUFFER_SIZE];
-    strcpy(absolute_path, ROOT_DIR);
-    if (!push_path(absolute_path, tmp + 1, 1))
-    {
-        write_message(connect->ConnectFD, MSG_550_WRONG_PATH);
-        return 1;
+    char virtual_path[BUFFER_SIZE], absolute_path[BUFFER_SIZE];
+    if (!get_absolute_path(virtual_path, absolute_path, connect, 1)){
+        return 0;
     }
 
     struct stat s = {0};
@@ -579,6 +538,35 @@ int RMD(struct ConnectionData *connect)
 {
     if (!check_userstate(connect))
         return 0;
+
+    char virtual_path[BUFFER_SIZE], absolute_path[BUFFER_SIZE];
+    if (!get_absolute_path(virtual_path, absolute_path, connect, 1)){
+        return 0;
+    }
+
+    struct stat s = {0};
+    stat(absolute_path, &s);
+    if (!(s.st_mode & S_IFDIR))
+    {
+        write_message(connect->ConnectFD, MSG_550_WRONG_PATH);
+        return 1;
+    }
+
+    if (startswith(connect->current_path, virtual_path)){ // when remove current directory
+        write_message(connect->ConnectFD, MSG_550_WRONG_PATH);
+        return 1;
+    }
+
+    if (!rmdir(absolute_path))
+	{
+        char msg_buffer[MAX_MSG_LEN];
+        sprintf(msg_buffer, MSG_250_RMD, virtual_path);
+		write_message(connect->ConnectFD, msg_buffer);
+	}
+	else
+	{
+		write_message(connect->ConnectFD, MSG_550_WRONG_PATH);
+	}
     return 1;
 }
 int RNFR(struct ConnectionData *connect)

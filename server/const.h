@@ -21,6 +21,7 @@ extern const char MSG_550_WRONG_PATH[];
 extern const char MSG_257_PWD[];
 extern const char MSG_250_CWD[];
 extern const char MSG_257_MKD[];
+extern const char MSG_250_RMD[];
 
 extern const char MSG_200_TEMPLATE[];
 extern const char MSG_504_TEMPLATE[];
