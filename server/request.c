@@ -7,6 +7,8 @@
 #include <arpa/inet.h>
 
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <dirent.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -207,59 +209,117 @@ int PASV(struct ConnectionData *connect)
     return 1;
 }
 
-static int open_data_connection(struct ConnectionData *_connect){
-    if (_connect->data_mode == NONE){
+static int open_data_connection(struct ConnectionData *_connect)
+{
+    if (_connect->data_mode == NONE)
+    {
         write_message(_connect->ConnectFD, MSG_425_NO_DATA_CONN);
         return 0;
     }
     if (_connect->data_mode == PASV_MODE)
-	{
-		_connect->dataConnectFD = accept(_connect->dataSocketFD, NULL, NULL);
-	}
+    {
+        _connect->dataConnectFD = accept(_connect->dataSocketFD, NULL, NULL);
+    }
     if (_connect->data_mode == PORT_MODE)
-	{
+    {
         // https://en.wikipedia.org/wiki/Berkeley_sockets#Client
-		_connect->dataConnectFD = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+        _connect->dataConnectFD = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
 
-        if (_connect->dataConnectFD == -1) {
+        if (_connect->dataConnectFD == -1)
+        {
             perror("cannot create socket");
             // TODO: more detailed message
             write_message(_connect->ConnectFD, MSG_425_NO_DATA_CONN);
             return 0;
         }
-        if (connect(_connect->dataConnectFD, (struct sockaddr *)&(_connect->data_address), sizeof (_connect->data_address)) == -1) {
+        if (connect(_connect->dataConnectFD, (struct sockaddr *)&(_connect->data_address), sizeof(_connect->data_address)) == -1)
+        {
             perror("connect failed");
             close(_connect->dataConnectFD);
             write_message(_connect->ConnectFD, MSG_425_NO_DATA_CONN);
             return 0;
         }
-	}
+    }
     return 1;
 }
 
-static void close_data_connection(struct ConnectionData *connect){
+static void close_data_connection(struct ConnectionData *connect)
+{
     if (connect->data_mode == PASV_MODE)
-	{
-		close(connect->dataSocketFD);
-		close(connect->dataConnectFD);
-	}
-    if (connect->data_mode == PORT_MODE){
+    {
+        close(connect->dataSocketFD);
+        close(connect->dataConnectFD);
+    }
+    if (connect->data_mode == PORT_MODE)
+    {
         close(connect->dataConnectFD);
     }
     connect->data_mode = NONE;
 }
 
-static void send_file(const char *filename, struct ConnectionData *connect){
+static void send_file(const char *filename, struct ConnectionData *connect)
+{
     int FD = open(filename, O_RDONLY);
     // TODO: rest position
     char buffer[BUFFER_SIZE];
-	for (;;)
-	{
-		int len = read(FD, buffer, BUFFER_SIZE);
-		if (!len) break;
-		write(connect->dataConnectFD, buffer, len);
-	}
-	write_message(connect->ConnectFD, MSG_226_TRANS_DONE);
+    for (;;)
+    {
+        int len = read(FD, buffer, BUFFER_SIZE);
+        if (!len)
+            break;
+        write(connect->dataConnectFD, buffer, len);
+    }
+    write_message(connect->ConnectFD, MSG_226_TRANS_DONE);
+}
+
+static void recv_file(const char *filename, struct ConnectionData *connect)
+{
+    int FD = open(filename, O_WRONLY | O_CREAT, S_IRWXU | S_IRWXG | S_IRWXO);
+    // TODO: rest position
+    char buffer[BUFFER_SIZE];
+    for (;;)
+    {
+        int len = read(connect->dataConnectFD, buffer, BUFFER_SIZE);
+        if (!len)
+            break;
+        write(FD, buffer, len);
+    }
+    write_message(connect->ConnectFD, MSG_226_TRANS_DONE);
+}
+
+// Reference: [linux 下用 c 实现 ls -l 命令 - Ritchie丶 - 博客园](https://www.cnblogs.com/Ritchie/p/6272693.html)
+static int send_ls(const char *dirname, struct ConnectionData *connect)
+{
+    DIR *dir_ptr;
+    struct dirent *direntp;
+
+    if ((dir_ptr = opendir(dirname)) == NULL)
+    {
+        return 0;
+    }
+    else
+    {
+        while ((direntp = readdir(dir_ptr)) != NULL)
+        {
+            struct stat info;
+            char absolute_path[BUFFER_SIZE];
+            strcpy(absolute_path, dirname);
+            push_path(absolute_path, direntp->d_name, 0);
+
+            if (stat(absolute_path, &info) == -1)
+                return 0;
+            else
+            {
+                char buffer[BUFFER_SIZE];
+                show_file_info(buffer, absolute_path, direntp->d_name, &info);
+                int len = strlen(buffer);
+                write(connect->dataConnectFD, buffer, len);
+            }
+        }
+        write_message(connect->ConnectFD, MSG_226_TRANS_DONE);
+        closedir(dir_ptr);
+        return 1;
+    }
 }
 
 int RETR(struct ConnectionData *connect)
@@ -278,29 +338,32 @@ int RETR(struct ConnectionData *connect)
 
     char absolute_path[BUFFER_SIZE];
     strcpy(absolute_path, ROOT_DIR);
-    if (!push_path(absolute_path, tmp+1, 0))
+    if (!push_path(absolute_path, tmp + 1, 0))
     {
         write_message(connect->ConnectFD, MSG_550_WRONG_PATH);
         return 1;
     }
 
     struct stat s = {0};
-	stat(absolute_path, &s);
-	if (!(s.st_mode & S_IFREG))
-	{
+    stat(absolute_path, &s);
+    if (!(s.st_mode & S_IFREG))
+    {
         // TODO: wrong message content
-		write_message(connect->ConnectFD, MSG_550_WRONG_PATH);
+        write_message(connect->ConnectFD, MSG_550_WRONG_PATH);
         return 1;
-	}else{
+    }
+    else
+    {
         write_message(connect->ConnectFD, MSG_150_DATA_CONN_READY);
     }
 
-    if (!open_data_connection(connect)){
+    if (!open_data_connection(connect))
+    {
         return 0;
     }
 
     send_file(absolute_path, connect);
-	
+
     close_data_connection(connect);
     return 1;
 }
@@ -309,7 +372,34 @@ int STOR(struct ConnectionData *connect)
 {
     if (!check_userstate(connect))
         return 0;
-    // TODO
+
+    char tmp[BUFFER_SIZE];
+    strcpy(tmp, connect->current_path);
+    if (!push_path(tmp, connect->param, 0))
+    {
+        write_message(connect->ConnectFD, MSG_550_WRONG_PATH);
+        return 1;
+    }
+
+    char absolute_path[BUFFER_SIZE];
+    strcpy(absolute_path, ROOT_DIR);
+    if (!push_path(absolute_path, tmp + 1, 0))
+    {
+        write_message(connect->ConnectFD, MSG_550_WRONG_PATH);
+        return 1;
+    }
+
+    write_message(connect->ConnectFD, MSG_150_DATA_CONN_READY);
+
+    if (!open_data_connection(connect))
+    {
+        return 0;
+    }
+
+    recv_file(absolute_path, connect);
+
+    close_data_connection(connect);
+
     return 1;
 }
 
@@ -366,7 +456,7 @@ int MKD(struct ConnectionData *connect)
 
     char absolute_path[BUFFER_SIZE];
     strcpy(absolute_path, ROOT_DIR);
-    if (!push_path(absolute_path, tmp+1, 1))
+    if (!push_path(absolute_path, tmp + 1, 1))
     {
         write_message(connect->ConnectFD, MSG_550_WRONG_PATH);
         return 1;
@@ -400,7 +490,7 @@ int CWD(struct ConnectionData *connect)
 
     char absolute_path[BUFFER_SIZE];
     strcpy(absolute_path, ROOT_DIR);
-    if (!push_path(absolute_path, tmp+1, 1))
+    if (!push_path(absolute_path, tmp + 1, 1))
     {
         write_message(connect->ConnectFD, MSG_550_WRONG_PATH);
         return 1;
@@ -435,7 +525,55 @@ int LIST(struct ConnectionData *connect)
 {
     if (!check_userstate(connect))
         return 0;
-    return 1;
+
+    // TODO: out of length
+    char tmp[BUFFER_SIZE];
+    strcpy(tmp, connect->current_path);
+    if (connect->param)
+    {
+        if (!push_path(tmp, connect->param, 1))
+        {
+            write_message(connect->ConnectFD, MSG_550_WRONG_PATH);
+            return 1;
+        }
+    }
+
+    char absolute_path[BUFFER_SIZE];
+    strcpy(absolute_path, ROOT_DIR);
+    if (!push_path(absolute_path, tmp + 1, 1))
+    {
+        write_message(connect->ConnectFD, MSG_550_WRONG_PATH);
+        return 1;
+    }
+
+    struct stat s = {0};
+    stat(absolute_path, &s);
+    if (!(s.st_mode & S_IFDIR))
+    {
+        write_message(connect->ConnectFD, MSG_550_WRONG_PATH);
+        return 1;
+    }
+    else
+    {
+        write_message(connect->ConnectFD, MSG_150_DATA_CONN_READY);
+    }
+
+    if (!open_data_connection(connect))
+    {
+        return 0;
+    }
+
+    if (!send_ls(absolute_path, connect))
+    {
+        write_message(connect->ConnectFD, MSG_550_WRONG_PATH);
+        close_data_connection(connect);
+        return 1;
+    }
+    else
+    {
+        close_data_connection(connect);
+        return 1;
+    }
 }
 int RMD(struct ConnectionData *connect)
 {
@@ -450,6 +588,12 @@ int RNFR(struct ConnectionData *connect)
     return 1;
 }
 int RNTO(struct ConnectionData *connect)
+{
+    if (!check_userstate(connect))
+        return 0;
+    return 1;
+}
+int REST(struct ConnectionData *connect)
 {
     if (!check_userstate(connect))
         return 0;

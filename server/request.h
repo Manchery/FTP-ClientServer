@@ -21,5 +21,6 @@ int LIST(struct ConnectionData *connect);
 int RMD(struct ConnectionData *connect);
 int RNFR(struct ConnectionData *connect);
 int RNTO(struct ConnectionData *connect);
+int REST(struct ConnectionData *connect);
 
 #endif

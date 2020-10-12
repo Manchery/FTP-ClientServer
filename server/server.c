@@ -23,6 +23,7 @@ void SIGINT_handler(int x)
     exit(EXIT_SUCCESS);
 }
 
+// TODO: args
 int main(void)
 {
     struct sockaddr_in sa;

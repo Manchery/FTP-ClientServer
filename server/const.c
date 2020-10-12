@@ -44,10 +44,11 @@ const char *VERBS[] = {
     "LIST",
     "RMD",
     "RNFR",
-    "RNTO"};
+    "RNTO",
+    "REST"};
 
 const int VERB_REQUIRE_PARAM[] = {
-    1, 1, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1};
+    1, 1, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 1};
 
 const verb_func VERB_FUNCS[] = {
     USER,
@@ -66,6 +67,7 @@ const verb_func VERB_FUNCS[] = {
     LIST,
     RMD,
     RNFR,
-    RNTO};
+    RNTO,
+    REST};
 
 char *ROOT_DIR = "/tmp/";
