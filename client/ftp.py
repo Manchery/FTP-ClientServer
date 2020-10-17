@@ -140,6 +140,30 @@ class FTPClient(object):
         res = self.connect_socket_receive()
         return res
 
+    def MKD(self, newpath):
+        req = ('MKD %s\r\n' % newpath).encode()
+        self.connect_socket.sendall(req)
+        res = self.connect_socket_receive()
+        return res
+
+    def RMD(self, path):
+        req = ('RMD %s\r\n' % path).encode()
+        self.connect_socket.sendall(req)
+        res = self.connect_socket_receive()
+        return res
+
+    def RNFR(self, path):
+        req = ('RNFR %s\r\n' % path).encode()
+        self.connect_socket.sendall(req)
+        res = self.connect_socket_receive()
+        return res
+    
+    def RNTO(self, path):
+        req = ('RNTO %s\r\n' % path).encode()
+        self.connect_socket.sendall(req)
+        res = self.connect_socket_receive()
+        return res
+
     def LIST(self, path):
         self.open_data_socket()
 

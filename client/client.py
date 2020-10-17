@@ -5,6 +5,7 @@ from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 from ftp import FTPClient
+from dialog import inputDialog, confirmDialog
 
 from log import Window
 import utils
@@ -44,22 +45,27 @@ class AbstractFileWidget(QWidget):
         selectedLayout.addWidget(self.selected, stretch=1)
         self.mainLayout.addLayout(selectedLayout)
 
+        self.buttonLayout = QHBoxLayout()
+        self.buttonLayout.setAlignment(Qt.AlignRight)
+        self.mainLayout.addLayout(self.buttonLayout)
+
         self.setLayout(self.mainLayout)
 
-        self.files.currentItemChanged.connect(self.selectionChanged)
+        self.files.currentItemChanged.connect(self.currentFileChanged)
 
         self.cwd = ''
 
-    def selectionChanged(self):
-        filename = self.files.currentItem().text(0)
-        path = os.path.abspath(os.path.join(self.cwd, filename))
-        self.selected.setText(path)
+    def currentFileChanged(self):
+        if self.files.currentItem() is not None:
+            filename = self.files.currentItem().text(0)
+            path = os.path.abspath(os.path.join(self.cwd, filename))
+            self.selected.setHidden(True)
+            self.selected.setText(path)
+            self.selected.setHidden(False)
 
     def addItem(self, item):
         self.files.addTopLevelItem(item)
-        print(item.text(0))
         if not self.files.currentItem():
-            print('aaa')
             self.files.setCurrentItem(self.files.topLevelItem(0))
             self.files.setEnabled(True)
 
@@ -144,6 +150,18 @@ class RemoteFileWidget(AbstractFileWidget):
         self.files.setHeaderLabels(
             ['Name', 'Size', 'Mode', 'Modified Time', 'Owner/Group'])
 
+        # TODO: button enable/disable
+        self.mkd_button = QPushButton(text='Make Dir')
+        self.buttonLayout.addWidget(self.mkd_button)
+        self.rmd_button = QPushButton(text='Remove Dir')
+        self.buttonLayout.addWidget(self.rmd_button)
+        self.rename_button = QPushButton(text='Rename')
+        self.buttonLayout.addWidget(self.rename_button)
+
+        self.mkd_button.clicked.connect(self.mkdButtonClicked)
+        self.rmd_button.clicked.connect(self.rmdButtonClicked)
+        self.rename_button.clicked.connect(self.renameButtonClicked)
+
         self.files.itemDoubleClicked.connect(self.fileDoubleClicked)
         self.pathEdit.returnPressed.connect(self.pathEditReturnPressed)
 
@@ -155,6 +173,31 @@ class RemoteFileWidget(AbstractFileWidget):
 
     def pathEditReturnPressed(self):
         self.updateRemotePath(os.path.abspath(self.pathEdit.text()))
+
+    def mkdButtonClicked(self):
+        new_dir = inputDialog('Make Dir', 'Dir name', parent=self)
+        if new_dir:
+            mkd_res = self.ftp.MKD(new_dir)
+            self.parent.log(mkd_res)
+            self.updateRemotePath(self.cwd)
+
+    def renameButtonClicked(self):
+        old_name = self.files.currentItem().text(0)
+        new_name = inputDialog('Rename', 'New name',
+                               default=old_name, parent=self)
+        if new_name and new_name != old_name:
+            rnfr_res = self.ftp.RNFR(old_name)
+            self.parent.log(rnfr_res)
+            rnto_res = self.ftp.RNTO(new_name)
+            self.parent.log(rnto_res)
+            self.updateRemotePath(self.cwd)
+
+    def rmdButtonClicked(self):
+        # TODO: check is (not) dir
+        if confirmDialog('Remove Dir', 'Sure?', parent=self):
+            rmd_res = self.ftp.RMD(self.selected.text())
+            self.parent.log(rmd_res)
+            self.updateRemotePath(self.cwd)
     # SLOTS END
 
     def updateRemotePath(self, newCwd):
@@ -164,8 +207,8 @@ class RemoteFileWidget(AbstractFileWidget):
 
         self.pathEditSetText(self.cwd)
 
-        list_req, list_data = self.ftp.LIST(self.cwd)
-        self.parent.log(list_req)
+        list_res, list_data = self.ftp.LIST(self.cwd)
+        self.parent.log(list_res)
         self.file_infos = [utils.get_file_info_from_str(x) for x in list_data]
 
         self.files.clear()
@@ -260,9 +303,10 @@ class MainWindow(QWidget):
             self.log(self.ftp.QUIT())
             self.remote.pathEditSetText('')
             self.remote.files.clear()
-        
+
         self.connected = not self.connected
-        self.connectButton.setText('Connect' if not self.connected else 'Disconnect')
+        self.connectButton.setText(
+            'Connect' if not self.connected else 'Disconnect')
 
     def createLoginLayout(self):
         loginLayout = QHBoxLayout()
@@ -286,7 +330,8 @@ class MainWindow(QWidget):
         loginLayout.addWidget(self.passwordEdit)
 
         self.connectButton = QPushButton()
-        self.connectButton.setText('Connect' if not self.connected else 'Disconnect')
+        self.connectButton.setText(
+            'Connect' if not self.connected else 'Disconnect')
         loginLayout.addWidget(self.connectButton)
 
         return loginLayout
