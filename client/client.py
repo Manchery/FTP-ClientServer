@@ -54,7 +54,8 @@ class UploadThread(AbstractDataThread):
         if self.rest != 0:
             self.ftp.REST(self.rest)
 
-        self.ftp.STOR(self.remote_file, self.local_file, self.rest != 0, self.rest)
+        self.ftp.STOR(self.remote_file, self.local_file,
+                      self.rest != 0, self.rest)
         self.finish.emit()
 
 
@@ -222,7 +223,7 @@ class RemoteFileWidget(AbstractFileWidget):
         self.buttonLayout.addWidget(self.cont_download_button)
         self.mkd_button = QPushButton(text='Make Dir')
         self.buttonLayout.addWidget(self.mkd_button)
-        self.rmd_button = QPushButton(text='Remove Dir')
+        self.rmd_button = QPushButton(text='Remove')
         self.buttonLayout.addWidget(self.rmd_button)
         self.rename_button = QPushButton(text='Rename')
         self.buttonLayout.addWidget(self.rename_button)
@@ -265,11 +266,15 @@ class RemoteFileWidget(AbstractFileWidget):
             self.updateRemotePath(self.cwd)
 
     def rmdButtonClicked(self):
-        # TODO: check is (not) dir
         if confirmDialog('Remove Dir', 'Sure?', parent=self):
-            rmd_res = self.ftp.RMD(self.selected.text())
-            self.parent.log(rmd_res)
-            self.updateRemotePath(self.cwd)
+            if self.files.currentItem().text(2).startswith('d'):
+                rmd_res = self.ftp.RMD(self.files.currentItem().text(0))
+                self.parent.log(rmd_res)
+                self.updateRemotePath(self.cwd)
+            else:
+                rmd_res = self.ftp.DELE(self.files.currentItem().text(0))
+                self.parent.log(rmd_res)
+                self.updateRemotePath(self.cwd)
 
     def downloadButtonClicked(self):
         mode = self.files.currentItem().text(2)
@@ -342,8 +347,12 @@ class MainWindow(QWidget):
         self.createGui()
 
         # debug
-        self.hostEdit.setText('59.66.136.21')
-        self.userEdit.setText('ssast')
+        # self.hostEdit.setText('59.66.136.21')
+        # self.userEdit.setText('ssast')
+        # self.passwordEdit.setText('ssast')
+
+        self.hostEdit.setText('192.168.98.132')
+        self.userEdit.setText('anonymous')
         self.passwordEdit.setText('ssast')
         # debug end
 
@@ -376,14 +385,16 @@ class MainWindow(QWidget):
             host = self.hostEdit.text()
             username = self.userEdit.text()
             password = self.passwordEdit.text()
+            port = int(self.portEdit.text())
 
-            self.log(self.ftp.open_connect_socket(host))
+            self.log(self.ftp.open_connect_socket(host, port))
             self.log(self.ftp.USER(username))
             self.log(self.ftp.PASS(password))
             self.log(self.ftp.SYST())
             self.log(self.ftp.TYPE())
 
             pwd_res = self.ftp.PWD()
+            print(pwd_res)
             self.log(pwd_res)
             cwd = re.search('\".*\"', pwd_res).group()[1:-1]
             self.remote.cwd = cwd
@@ -392,6 +403,7 @@ class MainWindow(QWidget):
             self.hostEdit.setDisabled(True)
             self.userEdit.setDisabled(True)
             self.passwordEdit.setDisabled(True)
+            self.portEdit.setDisabled(True)
         else:
             self.log(self.ftp.QUIT())
             self.remote.pathEditSetText('')
@@ -400,6 +412,7 @@ class MainWindow(QWidget):
             self.hostEdit.setDisabled(False)
             self.userEdit.setDisabled(False)
             self.passwordEdit.setDisabled(False)
+            self.portEdit.setDisabled(False)
 
         self.connected = not self.connected
         self.connectButton.setText(
@@ -409,9 +422,10 @@ class MainWindow(QWidget):
         ftp = FTPClient()
         ftp.data_mode = self.ftp.data_mode
         host = self.hostEdit.text()
+        port = int(self.portEdit.text())
         username = self.userEdit.text()
         password = self.passwordEdit.text()
-        ftp.open_connect_socket(host)
+        ftp.open_connect_socket(host, port)
         ftp.USER(username)
         ftp.PASS(password)
         ftp.TYPE()
@@ -466,7 +480,8 @@ class MainWindow(QWidget):
         local_dir = self.local.cwd
 
         remote_file = os.path.join(remote_dir, filename)
-        local_file = os.path.join(local_dir, self.local.files.currentItem().text(0))
+        local_file = os.path.join(
+            local_dir, self.local.files.currentItem().text(0))
 
         d_ftp = self.clone_ftp_connection()
 
@@ -479,7 +494,8 @@ class MainWindow(QWidget):
         item.setText(5, 'Pending')
         self.queue.addTopLevelItem(item)
 
-        downloadThread = DownloadThread(d_ftp, remote_file, local_file, self, rest)
+        downloadThread = DownloadThread(
+            d_ftp, remote_file, local_file, self, rest)
         downloadThread.responseGet.connect(lambda x: self.log(x))
 
         def modify_item(x):
@@ -541,7 +557,8 @@ class MainWindow(QWidget):
         remote_dir = self.remote.cwd
         local_dir = self.local.cwd
 
-        remote_file = os.path.join(remote_dir, self.remote.files.currentItem().text(0))
+        remote_file = os.path.join(
+            remote_dir, self.remote.files.currentItem().text(0))
         local_file = os.path.join(local_dir, filename)
 
         u_ftp = self.clone_ftp_connection()
@@ -602,6 +619,11 @@ class MainWindow(QWidget):
         self.passwordEdit.setEchoMode(QLineEdit.Password)
         loginLayout.addWidget(passwordLabel)
         loginLayout.addWidget(self.passwordEdit)
+
+        portLabel = QLabel('Port')
+        self.portEdit = QLineEdit('21')
+        loginLayout.addWidget(portLabel)
+        loginLayout.addWidget(self.portEdit)
 
         self.connectButton = QPushButton()
         self.connectButton.setText(

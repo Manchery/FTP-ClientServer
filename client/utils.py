@@ -5,14 +5,19 @@ import stat
 from ns import NS
 import os
 import time
-
-# [standard library - Getting a machine's external IP address with Python - Stack Overflow](https://stackoverflow.com/questions/2311510/getting-a-machines-external-ip-address-with-python)
+import socket
 
 
 def get_host_ip():
-    ip = get('https://api.ipify.org').text
-    # print 'My public IP address is:', ip
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.connect(('8.8.8.8', 80))
+    ip = s.getsockname()[0]
+    s.close()
     return ip
+
+    # # [standard library - Getting a machine's external IP address with Python - Stack Overflow](https://stackoverflow.com/questions/2311510/getting-a-machines-external-ip-address-with-python)
+    # ip = get('https://api.ipify.org').text
+    # return ip
 
 
 # [get open TCP port in Python - Stack Overflow](https://stackoverflow.com/questions/2838244/get-open-tcp-port-in-python/2838309#2838309)
@@ -25,6 +30,7 @@ def get_open_port():
     s.close()
     return port
 
+
 def get_file_info_from_str(s):
     x = s.split()
     info = NS()
@@ -36,6 +42,7 @@ def get_file_info_from_str(s):
     info.date = ' '.join(x[5:-1])
     info.filename = x[-1]
     return info
+
 
 def get_file_info(filepath):
     st = os.stat(filepath)
