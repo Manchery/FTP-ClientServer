@@ -193,6 +193,12 @@ class FTPClient(QObject):
         res = self.connect_socket_receive()
         return res
 
+    def DELE(self, path):
+        req = ('DELE %s\r\n' % path).encode()
+        self.connect_socket.sendall(req)
+        res = self.connect_socket_receive()
+        return res
+
     def RNFR(self, path):
         req = ('RNFR %s\r\n' % path).encode()
         self.connect_socket.sendall(req)
