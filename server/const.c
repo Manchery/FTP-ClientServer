@@ -22,6 +22,7 @@ const char MSG_350_RNFR[] = "350 Requested file action pending further informati
 const char MSG_503_RNTO_REQ_RNFR[] = "503 Bad sequence of commands.\r\n";
 const char MSG_451_RNTO_ERR[] = "451 Requested action aborted. Local error in processing.\r\n";
 const char MSG_250_RNTO_SUCC[] = "250 Rename successful.\r\n";
+const char MSG_250_DELE_SUCC[] = "250 Delete \"%s\" successful.\r\n";
 
 const char MSG_200_TEMPLATE[] = "200 %s\r\n";
 const char MSG_504_TEMPLATE[] = "504 %s\r\n";
@@ -32,7 +33,7 @@ const char MSG_425_NO_DATA_CONN[] = "425 No data connection.\r\n";
 const char MSG_150_DATA_CONN_READY[] = "150 File status okay; about to open data connection.\r\n";
 const char MSG_226_TRANS_DONE[] = "226 Transfer complete.\r\n";
 
-const int NUM_VERBS = 17;
+const int NUM_VERBS = 19;
 const char *VERBS[] = {
     "USER",
     "PASS",
@@ -51,11 +52,11 @@ const char *VERBS[] = {
     "RMD",
     "RNFR",
     "RNTO",
-    "REST"};
-    // TODO: DELE
+    "REST",
+    "DELE"};
 
 const int VERB_REQUIRE_PARAM[] = {
-    1, 1, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 1};
+    1, 1, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 1, 1};
 
 const verb_func VERB_FUNCS[] = {
     USER,
@@ -75,7 +76,8 @@ const verb_func VERB_FUNCS[] = {
     RMD,
     RNFR,
     RNTO,
-    REST};
+    REST,
+    DELE};
 
 char ROOT_DIR[BUFFER_SIZE] = "/tmp/";
 int FTP_SERVER_PORT=21;

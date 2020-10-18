@@ -23,4 +23,6 @@ int RNFR(struct ConnectionData *connect);
 int RNTO(struct ConnectionData *connect);
 int REST(struct ConnectionData *connect);
 
+int DELE(struct ConnectionData *connect);
+
 #endif

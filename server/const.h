@@ -28,6 +28,7 @@ extern const char MSG_350_RNFR[];
 extern const char MSG_503_RNTO_REQ_RNFR[];
 extern const char MSG_451_RNTO_ERR[];
 extern const char MSG_250_RNTO_SUCC[];
+extern const char MSG_250_DELE_SUCC[];
 
 extern const char MSG_200_TEMPLATE[];
 extern const char MSG_504_TEMPLATE[];

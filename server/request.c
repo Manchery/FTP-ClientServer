@@ -582,6 +582,39 @@ int RMD(struct ConnectionData *connect)
 	}
     return 1;
 }
+
+int DELE(struct ConnectionData *connect){
+    if (!check_userstate(connect))
+        return 0;
+
+    char virtual_path[BUFFER_SIZE], absolute_path[BUFFER_SIZE];
+    if (!get_absolute_path(virtual_path, absolute_path, connect, 0)){
+        return 0;
+    }
+
+    struct stat s = {0};
+    stat(absolute_path, &s);
+    if (!(s.st_mode & S_IFREG))
+    {
+        // TODO: wrong message content
+        write_message(connect->ConnectFD, MSG_550_WRONG_PATH);
+        return 1;
+    }
+
+    if (!remove(absolute_path))
+	{
+        char msg_buffer[MAX_MSG_LEN];
+        sprintf(msg_buffer, MSG_250_DELE_SUCC, virtual_path);
+		write_message(connect->ConnectFD, msg_buffer);
+	}
+	else
+	{
+		write_message(connect->ConnectFD, MSG_550_WRONG_PATH);
+	}
+
+    return 1;
+}
+
 int RNFR(struct ConnectionData *connect)
 {
     if (!check_userstate(connect))
