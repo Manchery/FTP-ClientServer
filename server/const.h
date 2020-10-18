@@ -1,7 +1,6 @@
 #ifndef CONST
 #define CONST
 
-#define FTP_SERVER_PORT 21
 #define MAX_VERB_LEN 5
 
 #define BUFFER_SIZE 2048
@@ -48,6 +47,7 @@ struct ConnectionData;
 typedef int (*verb_func)(struct ConnectionData *);
 extern const verb_func VERB_FUNCS[];
 
-extern char *ROOT_DIR;
+extern char ROOT_DIR[BUFFER_SIZE];
+extern int FTP_SERVER_PORT;
 
 #endif

@@ -23,7 +23,7 @@ const char MSG_503_RNTO_REQ_RNFR[] = "503 Bad sequence of commands.\r\n";
 const char MSG_451_RNTO_ERR[] = "451 Requested action aborted. Local error in processing.\r\n";
 const char MSG_250_RNTO_SUCC[] = "250 Rename successful.\r\n";
 
-const char MSG_200_TEMPLATE[] = "220 %s\r\n";
+const char MSG_200_TEMPLATE[] = "200 %s\r\n";
 const char MSG_504_TEMPLATE[] = "504 %s\r\n";
 const char MSG_501_TEMPLATE[] = "501 %s\r\n";
 const char MSG_530_TEMPLATE[] = "530 %s\r\n";
@@ -52,6 +52,7 @@ const char *VERBS[] = {
     "RNFR",
     "RNTO",
     "REST"};
+    // TODO: DELE
 
 const int VERB_REQUIRE_PARAM[] = {
     1, 1, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 1};
@@ -76,4 +77,5 @@ const verb_func VERB_FUNCS[] = {
     RNTO,
     REST};
 
-char *ROOT_DIR = "/tmp/";
+char ROOT_DIR[BUFFER_SIZE] = "/tmp/";
+int FTP_SERVER_PORT=21;

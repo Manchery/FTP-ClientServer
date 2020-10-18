@@ -23,9 +23,21 @@ void SIGINT_handler(int x)
     exit(EXIT_SUCCESS);
 }
 
-// TODO: args
-int main(void)
+int main(int argc, char **argv)
 {
+    // check argvs
+    for (int i = 1; i < argc; i++)
+    {
+        if (!strcmp(argv[i], "-port"))
+        {
+            FTP_SERVER_PORT = atoi(argv[i + 1]);
+        }
+        if (!strcmp(argv[i], "-root"))
+        {
+            strcpy(ROOT_DIR, argv[i + 1]);
+        }
+    }
+
     struct sockaddr_in sa;
     SocketFD = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (SocketFD == -1)
