@@ -1,12 +1,16 @@
 import socket
 import utils
 import re
+from PyQt5.QtCore import *
 
 
-class FTPClient(object):
-    BUFFER_SIZE = 2048
+class FTPClient(QObject):
+    BUFFER_SIZE = 8192
+    responseGet = pyqtSignal(str)
+    dataProgress = pyqtSignal(int)
 
-    def __init__(self):
+    def __init__(self, parent=None):
+        super().__init__(parent)
         self.connect_socket = None
         self.data_socket = None
         self.data_mode = 'PASV'
@@ -27,19 +31,48 @@ class FTPClient(object):
                     break
         return '\n'.join(lines)
 
-    def data_socket_receive(self):
+    def data_socket_receive(self, output_pipe=None):
         if self.data_mode == 'PORT':
-            sock,_ = self.data_socket.accept()
+            sock, _ = self.data_socket.accept()
         else:
             sock = self.data_socket
-        
-        data = b''
+
+        if output_pipe is None:
+            data = b''
+            current_size = 0
+            while True:
+                buffer = sock.recv(self.BUFFER_SIZE)
+                # print(buffer)
+                data += buffer
+                current_size += len(buffer)
+                self.dataProgress.emit(current_size)
+                if not buffer:
+                    break
+            return data
+        else:
+            current_size = 0
+            while True:
+                buffer = sock.recv(self.BUFFER_SIZE)
+                current_size += len(buffer)
+                output_pipe.write(buffer)
+                self.dataProgress.emit(current_size)
+                if not buffer:
+                    break
+
+    def data_socket_send(self, input_pipe=None):
+        if self.data_mode == 'PORT':
+            sock, _ = self.data_socket.accept()
+        else:
+            sock = self.data_socket
+
+        current_size = 0
         while True:
-            buffer = sock.recv(self.BUFFER_SIZE)
-            data += buffer
+            buffer = input_pipe.read(self.BUFFER_SIZE)
+            sock.send(buffer)
+            current_size += len(buffer)
+            self.dataProgress.emit(current_size)
             if not buffer:
                 break
-        return data
 
     def open_data_socket(self):
         if self.data_mode == 'PASV':
@@ -101,6 +134,11 @@ class FTPClient(object):
 
     def PORT(self):
         ip = utils.get_host_ip()
+
+        if self.data_socket is None:
+            self.data_socket = socket.socket(
+                socket.AF_INET, socket.SOCK_STREAM)
+
         self.data_socket.bind(('', 0))
         _, port = self.data_socket.getsockname()
         self.data_socket.listen(1)
@@ -109,12 +147,15 @@ class FTPClient(object):
         print(req)
         self.connect_socket.sendall(req)
         res = self.connect_socket_receive()
+        # self.responseGet.emit(res)
+        print(res)
         return res
 
     def PASV(self):
         req = 'PASV\r\n'.encode()
         self.connect_socket.sendall(req)
         res = self.connect_socket_receive()
+        print(res)
 
         matched = re.search('(\d*),(\d*),(\d*),(\d*),(\d*),(\d*)', res).group()
         matched = matched.split(',')
@@ -157,7 +198,7 @@ class FTPClient(object):
         self.connect_socket.sendall(req)
         res = self.connect_socket_receive()
         return res
-    
+
     def RNTO(self, path):
         req = ('RNTO %s\r\n' % path).encode()
         self.connect_socket.sendall(req)
@@ -177,3 +218,56 @@ class FTPClient(object):
         res += '\n' + self.connect_socket_receive()
 
         return res, data.decode('utf-8').split('\r\n')[:-1]
+
+    def RETR(self, remote_file, local_file, cont=False):
+        print(remote_file, local_file)
+        self.open_data_socket()
+
+        req = ('RETR %s\r\n' % remote_file).encode()
+        print(req)
+        self.connect_socket.sendall(req)
+        res = self.connect_socket_receive()
+        self.responseGet.emit(res)
+
+        with open(local_file, 'wb' if not cont else 'ab') as f:
+            self.data_socket_receive(f)
+
+        self.close_data_socket()
+
+        new_res = self.connect_socket_receive()
+        res += '\n' + new_res
+        self.responseGet.emit(new_res)
+
+        return res
+
+    def STOR(self, remote_file, local_file, cont=False, rest=0):
+        print(remote_file, local_file)
+        self.open_data_socket()
+
+        req = ('STOR %s\r\n' % remote_file).encode()
+        print(req)
+        self.connect_socket.sendall(req)
+        res = self.connect_socket_receive()
+        self.responseGet.emit(res)
+
+        with open(local_file, 'rb') as f:
+            if cont:
+                f.seek(rest)
+            self.data_socket_send(f)
+
+        self.close_data_socket()
+
+        new_res = self.connect_socket_receive()
+        res += '\n' + new_res
+        self.responseGet.emit(new_res)
+
+        return res
+
+    def REST(self, rest):
+        req = ('REST %d\r\n' % rest).encode()
+        print(req)
+        self.connect_socket.sendall(req)
+        res = self.connect_socket_receive()
+        self.responseGet.emit(res)
+
+        return res
