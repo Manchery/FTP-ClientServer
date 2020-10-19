@@ -15,7 +15,15 @@
 int write_message(int ConnectFD, const char *msg)
 {
     write(ConnectFD, msg, strlen(msg));
+    printf("%s\n", msg);
     return 1;
+}
+
+int write_message_template(int ConnectFD, const char *template, const char *content)
+{
+    char msg_buffer[MAX_MSG_LEN];
+    sprintf(msg_buffer, template, content);
+    return write_message(ConnectFD, msg_buffer);
 }
 
 static int parse_request(char *buffer, struct ConnectionData *connect)

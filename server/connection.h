@@ -42,6 +42,7 @@ struct ConnectionData{
 };
 
 int write_message(int ConnectFD, const char *msg);
+int write_message_template(int ConnectFD, const char *template, const char *content);
 void *connection(void *arg);
 
 #endif

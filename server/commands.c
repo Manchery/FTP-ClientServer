@@ -33,9 +33,7 @@ int USER(struct ConnectionData *connect)
 {
     if (strcmp("anonymous", connect->param))
     {
-        char msg_buffer[MAX_MSG_LEN];
-        sprintf(msg_buffer, MSG_530_TEMPLATE, "This FTP server is anonymous only.");
-        write_message(connect->ConnectFD, msg_buffer);
+        write_message_template(connect->ConnectFD, MSG_530_TEMPLATE, "This FTP server is anonymous only.");
         return 1;
     }
     else
@@ -48,20 +46,17 @@ int USER(struct ConnectionData *connect)
 
 int PASS(struct ConnectionData *connect)
 {
-    char msg_buffer[MAX_MSG_LEN];
     switch (connect->user_state)
     {
     case NOT_LOGIN:
-        sprintf(msg_buffer, MSG_530_TEMPLATE, "Need username.");
-        write_message(connect->ConnectFD, msg_buffer);
+        write_message_template(connect->ConnectFD, MSG_530_TEMPLATE, "Need username.");
         break;
     case REQUIRE_PASS:
         write_message(connect->ConnectFD, MSG_230_LOGIN_SUCC);
         connect->user_state = LOGIN;
         break;
     case LOGIN:
-        sprintf(msg_buffer, MSG_530_TEMPLATE, "Already logged in.");
-        write_message(connect->ConnectFD, msg_buffer);
+        write_message_template(connect->ConnectFD, MSG_530_TEMPLATE, "Already logged in.");
         break;
     }
     return 1;
@@ -124,9 +119,7 @@ int PORT(struct ConnectionData *connect)
     }
     else
     {
-        char msg_buffer[MAX_MSG_LEN];
-        sprintf(msg_buffer, MSG_501_TEMPLATE, "Invalid IP address or port.");
-        write_message(connect->ConnectFD, msg_buffer);
+        write_message_template(connect->ConnectFD, MSG_501_TEMPLATE, "Invalid IP address or port.");
     }
     return 1;
 }
@@ -395,17 +388,14 @@ int TYPE(struct ConnectionData *connect)
     if (!check_userstate(connect))
         return 0;
 
-    char msg_buffer[MAX_MSG_LEN];
     if (strcmp("I", connect->param))
     {
-        sprintf(msg_buffer, MSG_504_TEMPLATE, "Only support TYPE I");
-        write_message(connect->ConnectFD, msg_buffer);
+        write_message_template(connect->ConnectFD, MSG_504_TEMPLATE, "Only support TYPE I");
         return 1;
     }
     else
     {
-        sprintf(msg_buffer, MSG_200_TEMPLATE, "Type set to I.");
-        write_message(connect->ConnectFD, msg_buffer);
+        write_message_template(connect->ConnectFD, MSG_200_TEMPLATE, "Type set to I.");
         return 1;
     }
 }
@@ -438,9 +428,7 @@ int MKD(struct ConnectionData *connect)
         return 1;
     }
 
-    char msg_buffer[MAX_MSG_LEN];
-    sprintf(msg_buffer, MSG_257_MKD, virtual_path);
-    write_message(connect->ConnectFD, msg_buffer);
+    write_message_template(connect->ConnectFD, MSG_257_MKD, virtual_path);
     return 1;
 }
 int CWD(struct ConnectionData *connect)
@@ -463,9 +451,7 @@ int CWD(struct ConnectionData *connect)
 
     strcpy(connect->current_path, virtual_path);
 
-    char msg_buffer[MAX_MSG_LEN];
-    sprintf(msg_buffer, MSG_250_CWD, connect->current_path);
-    write_message(connect->ConnectFD, msg_buffer);
+    write_message_template(connect->ConnectFD, MSG_250_CWD, connect->current_path);
     return 1;
 }
 int PWD(struct ConnectionData *connect)
@@ -473,9 +459,7 @@ int PWD(struct ConnectionData *connect)
     if (!check_userstate(connect))
         return 0;
 
-    char msg_buffer[MAX_MSG_LEN];
-    sprintf(msg_buffer, MSG_257_PWD, connect->current_path);
-    write_message(connect->ConnectFD, msg_buffer);
+    write_message_template(connect->ConnectFD, MSG_257_PWD, connect->current_path);
     return 1;
 }
 int LIST(struct ConnectionData *connect)
@@ -542,9 +526,7 @@ int RMD(struct ConnectionData *connect)
 
     if (!rmdir(absolute_path))
 	{
-        char msg_buffer[MAX_MSG_LEN];
-        sprintf(msg_buffer, MSG_250_RMD, virtual_path);
-		write_message(connect->ConnectFD, msg_buffer);
+		write_message_template(connect->ConnectFD, MSG_250_RMD, virtual_path);
 	}
 	else
 	{
@@ -573,9 +555,7 @@ int DELE(struct ConnectionData *connect){
 
     if (!remove(absolute_path))
 	{
-        char msg_buffer[MAX_MSG_LEN];
-        sprintf(msg_buffer, MSG_250_DELE_SUCC, virtual_path);
-		write_message(connect->ConnectFD, msg_buffer);
+		write_message_template(connect->ConnectFD, MSG_250_DELE_SUCC, virtual_path);
 	}
 	else
 	{
@@ -647,9 +627,7 @@ int REST(struct ConnectionData *connect)
         // TODO: message content
         write_message(connect->ConnectFD, MSG_350_RNFR); 
     }else{
-        char msg_buffer[MAX_MSG_LEN];
-        sprintf(msg_buffer, MSG_501_TEMPLATE, "Syntax error in parameters or arguments.");
-		write_message(connect->ConnectFD, msg_buffer);
+		write_message_template(connect->ConnectFD, MSG_501_TEMPLATE, "Syntax error in parameters or arguments.");
     }
 
     return 1;
