@@ -9,6 +9,7 @@ extern const char MSG_150_DATA_CONN_READY[];
 
 extern const char MSG_200_PORT_OK[];
 extern const char MSG_215_UNIX_TYPE[];
+extern const char MSG_220_CONNECT_OK[];
 extern const char MSG_221_GOODBYE[];
 extern const char MSG_226_TRANS_DONE[];
 extern const char MSG_227_PASV_OK[];

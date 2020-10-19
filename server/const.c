@@ -6,6 +6,7 @@ const char MSG_150_DATA_CONN_READY[] = "150 File status okay; about to open data
 
 const char MSG_200_PORT_OK[] = "200 PORT command successful.\r\n";
 const char MSG_215_UNIX_TYPE[] = "215 UNIX Type: L8\r\n";
+const char MSG_220_CONNECT_OK[] = "220 Anonymous FTP server ready.\r\n";
 const char MSG_221_GOODBYE[] = "221 Goodbye.\r\n";
 const char MSG_226_TRANS_DONE[] = "226 Transfer complete.\r\n";
 const char MSG_227_PASV_OK[] = "227 Entering Passive Mode (%s,%d,%d)\r\n";

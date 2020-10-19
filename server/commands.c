@@ -20,7 +20,6 @@
 
 // For verbs, to return 1 means it processes as expected
 
-// TODO: carefully go over and check the code
 static int check_userstate(struct ConnectionData *connect)
 {
     if (connect->user_state != LOGIN)

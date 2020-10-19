@@ -598,7 +598,6 @@ class MainWindow(QWidget):
 
         self.setLayout(self.mainLayout)
 
-    # TODO: portEdit
     def createLoginLayout(self):
         loginLayout = QHBoxLayout()
 

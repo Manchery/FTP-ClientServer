@@ -15,7 +15,7 @@
 int write_message(int ConnectFD, const char *msg)
 {
     write(ConnectFD, msg, strlen(msg));
-    printf("%s\n", msg);
+    // printf("%s\n", msg);
     return 1;
 }
 
@@ -77,47 +77,66 @@ void *connection(void *arg)
     connect.ConnectFD = ConnectFD;
     strcpy(connect.current_path, "/");
 
-    char buffer[BUFFER_SIZE + 1];
+    char buffer[BUFFER_SIZE + 1], command[BUFFER_SIZE + 1] = {0};
+    int buffer_len, command_len;
 
     write_message(ConnectFD, MSG_220_CONNECT_OK);
+    
+    // to read command ends with '\r\n'
     for (;;)
     {
-        // TODO: multi segment (\r\n)
-        int len = read(ConnectFD, buffer, BUFFER_SIZE);
-        buffer[len] = '\0';
-        // for (int i = 0; i < len; i++)
-        // {
-        //     printf("%d ", (int)buffer[i]);
-        // }
-        // printf("\n");
-        if (len == 0)
+        buffer_len = read(ConnectFD, buffer, BUFFER_SIZE);
+        if (buffer_len < 0)
+        {
+            perror("error read()");
+            break;
+        }
+        if (buffer_len == 0)
         {
             break;
         }
-        // TODO: check buffer endswith \r\n
-        connect.verb_idx = parse_request(buffer, &connect);
 
-        // TODO: remove all printf
-        printf("%d\n%s\n%s\n", connect.verb_idx, connect.verb, connect.param);
+        buffer[buffer_len] = '\0';
 
-        if (connect.verb_idx == -1)
+        if (command_len + buffer_len > BUFFER_SIZE)
         {
-            write_message(ConnectFD, MSG_500_CMD_INVALID);
-            perror("invalid verb");
-            // break;
-        }
-        if (VERB_REQUIRE_PARAM[connect.verb_idx] && !connect.param)
-        {
-            write_message(ConnectFD, MSG_501_PARAM_INVALID);
-            perror("request need a parameter");
-            // break;
-        }
-
-        VERB_FUNCS[connect.verb_idx](&connect);
-
-        if (!strcmp(connect.verb, "QUIT"))
-        {
+            write_message_template(ConnectFD, MSG_451_ACTION_FAIL, "out of length when reading command.");
             break;
+        }
+
+        for (int i = 0; i < buffer_len; i++)
+            command[command_len++] = buffer[i];
+
+        if (command_len >= 2 && command[command_len - 2] == '\r' && command[command_len - 1] == '\n')
+        {
+            command[command_len] = '\0';
+
+            connect.verb_idx = parse_request(command, &connect);
+
+            // printf("%d\n%s\n%s\n", connect.verb_idx, connect.verb, connect.param);
+
+            if (connect.verb_idx == -1)
+            {
+                write_message(ConnectFD, MSG_500_CMD_INVALID);
+                perror("invalid verb");
+                // break;
+            }
+            if (VERB_REQUIRE_PARAM[connect.verb_idx] && !connect.param)
+            {
+                write_message(ConnectFD, MSG_501_PARAM_INVALID);
+                perror("request need a parameter");
+                // break;
+            }
+
+            VERB_FUNCS[connect.verb_idx](&connect);
+
+            if (!strcmp(connect.verb, "QUIT"))
+            {
+                break;
+            }
+
+            command_len = 0;
+            memset(command, 0, sizeof(command));
         }
     }
 
