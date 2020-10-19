@@ -12,6 +12,9 @@
 #include <string.h>
 #include <ctype.h>
 
+// ---------------- String --------------------
+
+// change to upper case
 void strupp(char *beg)
 {
     while (*beg)
@@ -40,11 +43,19 @@ int endswith(const char *str, char *pattern)
     return 1;
 }
 
-int startswith_char(const char *str, char c) { return str[0] == c; }
-int endswith_char(const char *str, char c) { return str[strlen(str) - 1] == c; }
-
-int pop_path(char *source)
+int startswith_char(const char *str, char c)
 {
+    return str[0] == c;
+}
+int endswith_char(const char *str, char c)
+{
+    return str[strlen(str) - 1] == c;
+}
+
+// back to parent dir, assume not end with '/'
+static int pop_path(char *source)
+{
+    // root: fail
     if (strlen(source) == 1 && source[0] == '/')
         return 0;
     int p = strlen(source) - 1;
@@ -53,8 +64,10 @@ int pop_path(char *source)
     return 1;
 }
 
+// append path (target) to the end of path (source)
 int push_path(char *source, const char *target, int is_dir)
 {
+    // absolute path
     if (startswith_char(target, '/'))
     {
         strcpy(source, target);
@@ -81,6 +94,7 @@ int push_path(char *source, const char *target, int is_dir)
             }
             else if (!strcmp(buffer, ".."))
             {
+                // back to parent dir
                 if (!pop_path(tmp))
                     return 0;
             }
