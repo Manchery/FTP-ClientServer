@@ -78,3 +78,6 @@ const verb_func VERB_FUNCS[] = {
     RNTO,
     REST,
     DELE};
+
+char ROOT_DIR[BUFFER_SIZE] = "/tmp/";
+int FTP_SERVER_PORT=21;

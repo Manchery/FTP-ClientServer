@@ -63,14 +63,20 @@ static int parse_request(char *buffer, struct ConnectionData *connect)
 
 void *connection(void *arg)
 {
-    struct ConnectionData *connect = (struct ConnectionData *)arg;
+    int ConnectFD = *((int *)arg);
+
+    struct ConnectionData connect;
+    memset(&connect, 0, sizeof(connect));
+    connect.ConnectFD = ConnectFD;
+    strcpy(connect.current_path, "/");
+
     char buffer[BUFFER_SIZE + 1];
 
-    write_message(connect->ConnectFD, MSG_220_CONNECT_OK);
+    write_message(ConnectFD, MSG_220_CONNECT_OK);
     for (;;)
     {
         // TODO: multi segment (\r\n)
-        int len = read(connect->ConnectFD, buffer, BUFFER_SIZE);
+        int len = read(ConnectFD, buffer, BUFFER_SIZE);
         buffer[len] = '\0';
         // for (int i = 0; i < len; i++)
         // {
@@ -82,30 +88,30 @@ void *connection(void *arg)
             break;
         }
         // TODO: check buffer endswith \r\n
-        connect->verb_idx = parse_request(buffer, connect);
+        connect.verb_idx = parse_request(buffer, &connect);
+        
+        printf("%d\n%s\n%s\n", connect.verb_idx, connect.verb, connect.param);
 
-        printf("%d\n%s\n%s\n", connect->verb_idx, connect->verb, connect->param);
-
-        if (connect->verb_idx == -1)
+        if (connect.verb_idx == -1)
         {
             perror("invalid verb");
             break;
         }
-        if (VERB_REQUIRE_PARAM[connect->verb_idx] && !connect->param)
+        if (VERB_REQUIRE_PARAM[connect.verb_idx] && !connect.param)
         {
             // TODO: print specific verb
             perror("request need a parameter");
             break;
         }
 
-        VERB_FUNCS[connect->verb_idx](connect);
+        VERB_FUNCS[connect.verb_idx](&connect);
 
-        if (!strcmp(connect->verb, "QUIT"))
+        if (!strcmp(connect.verb, "QUIT"))
         {
             break;
         }
     }
 
-    close(connect->ConnectFD);
+    close(ConnectFD);
     return 0;
 }

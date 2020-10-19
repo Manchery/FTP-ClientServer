@@ -309,7 +309,7 @@ static int get_absolute_path(char *virtual_path, char *absolute_path, struct Con
         }
     }
 
-    strcpy(absolute_path, connect->root_path);
+    strcpy(absolute_path, ROOT_DIR);
     if (!push_path(absolute_path, virtual_path + 1, is_dir))
     {
         write_message(connect->ConnectFD, MSG_550_WRONG_PATH);

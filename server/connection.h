@@ -32,7 +32,6 @@ struct ConnectionData{
     int dataSocketFD;
     int dataConnectFD;
 
-    char root_path[BUFFER_SIZE];
     char current_path[BUFFER_SIZE];
 
     enum RNFRState RNFR_state;
