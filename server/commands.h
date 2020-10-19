@@ -4,6 +4,8 @@
 #include "const.h"
 #include "connection.h"
 
+// For verbs, to return 1 means it processes as expected
+
 int USER(struct ConnectionData *connect);
 int PASS(struct ConnectionData *connect);
 int PORT(struct ConnectionData *connect);

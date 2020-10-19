@@ -4,35 +4,41 @@
 #include "commands.h"
 #include <netinet/in.h>
 
-enum UserState {
-    NOT_LOGIN, REQUIRE_PASS, LOGIN
+enum UserState
+{
+    NOT_LOGIN,
+    REQUIRE_PASS,
+    LOGIN
 };
 
-enum DataMode{
+enum DataMode
+{
     NONE_MODE,
     PORT_MODE,
     PASV_MODE
 };
 
-enum RNFRState{
+enum RNFRState
+{
     NO_RNFR,
     RNFR_READY
 };
 
-struct ConnectionData{
-    int ConnectFD;                      // connect socket
+struct ConnectionData
+{
+    int ConnectFD; // connect socket
     int verb_idx;
-    const char* verb;                   // command verb
-    const char* param;                  // command parameters
+    const char *verb;  // command verb
+    const char *param; // command parameters
 
     enum UserState user_state;
 
     enum DataMode data_mode;
     struct sockaddr_in data_address;
-    int dataSocketFD;                   // data listen socket
-    int dataConnectFD;                  // data connect socket
+    int dataSocketFD;  // data listen socket, used by PASV
+    int dataConnectFD; // data connect socket, used by PASV and PORT
 
-    char current_path[BUFFER_SIZE];     // virtual: under ROOT_DIR
+    char current_path[BUFFER_SIZE]; // virtual: under ROOT_DIR
 
     // for rename
     enum RNFRState RNFR_state;

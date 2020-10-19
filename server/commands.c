@@ -18,6 +18,8 @@
 #include <assert.h>
 #include <unistd.h>
 
+// For verbs, to return 1 means it processes as expected
+
 // TODO: carefully go over and check the code
 static int check_userstate(struct ConnectionData *connect)
 {
@@ -33,7 +35,7 @@ int USER(struct ConnectionData *connect)
 {
     if (strcmp("anonymous", connect->param))
     {
-        write_message_template(connect->ConnectFD, MSG_530_TEMPLATE, "This FTP server is anonymous only.");
+        write_message_by_code(connect->ConnectFD, 530, "This FTP server is anonymous only.");
         return 1;
     }
     else
@@ -49,19 +51,20 @@ int PASS(struct ConnectionData *connect)
     switch (connect->user_state)
     {
     case NOT_LOGIN:
-        write_message_template(connect->ConnectFD, MSG_530_TEMPLATE, "Need username.");
+        write_message_by_code(connect->ConnectFD, 530, "Need username.");
         break;
     case REQUIRE_PASS:
         write_message(connect->ConnectFD, MSG_230_LOGIN_SUCC);
         connect->user_state = LOGIN;
         break;
     case LOGIN:
-        write_message_template(connect->ConnectFD, MSG_530_TEMPLATE, "Already logged in.");
+        write_message_by_code(connect->ConnectFD, 530, "Already logged in.");
         break;
     }
     return 1;
 }
 
+// param format: h1,h2,h3,h4,p1,p2
 static int parse_data_address(struct sockaddr_in *data_address, const char *param)
 {
     int len = strlen(param);
@@ -119,7 +122,7 @@ int PORT(struct ConnectionData *connect)
     }
     else
     {
-        write_message_template(connect->ConnectFD, MSG_501_TEMPLATE, "Invalid IP address or port.");
+        write_message_by_code(connect->ConnectFD, 501, "Invalid IP address or port.");
     }
     return 1;
 }
@@ -129,7 +132,7 @@ int PASV(struct ConnectionData *connect)
     if (!check_userstate(connect))
         return 0;
 
-    // TODO: drop connections already made
+    // drop connections already made
     if (connect->data_mode == PASV_MODE)
     {
         close(connect->dataSocketFD);
@@ -145,7 +148,7 @@ int PASV(struct ConnectionData *connect)
 
     bzero(&(connect->data_address), sizeof(connect->data_address));
     connect->data_address.sin_family = AF_INET;
-    connect->data_address.sin_port = htons(0); // TODO: why 0?
+    connect->data_address.sin_port = htons(0);
     connect->data_address.sin_addr.s_addr = htonl(INADDR_ANY);
 
     int reuse = 1;
@@ -165,7 +168,7 @@ int PASV(struct ConnectionData *connect)
         if (ip[i] == '.')
             ip[i] = ',';
 
-    char msg_buffer[MAX_MSG_LEN];
+    char msg_buffer[BUFFER_SIZE];
     sprintf(msg_buffer, MSG_227_PASV_OK, ip, port / 256, port % 256);
     write_message(connect->ConnectFD, msg_buffer);
 
@@ -191,7 +194,6 @@ static int open_data_connection(struct ConnectionData *_connect)
         if (_connect->dataConnectFD == -1)
         {
             perror("cannot create socket");
-            // TODO: more detailed message
             write_message(_connect->ConnectFD, MSG_425_NO_DATA_CONN);
             return 0;
         }
@@ -220,11 +222,14 @@ static void close_data_connection(struct ConnectionData *connect)
     connect->data_mode = NONE_MODE;
 }
 
-static void send_file(const char *filename, struct ConnectionData *connect)
+static int send_file(const char *filename, struct ConnectionData *connect)
 {
     int FD = open(filename, O_RDONLY);
-    
-    if (connect->rest_position){
+    if (FD == -1)
+        return 0;
+
+    if (connect->rest_position)
+    {
         lseek(FD, connect->rest_position, SEEK_SET);
         connect->rest_position = 0;
     }
@@ -238,18 +243,25 @@ static void send_file(const char *filename, struct ConnectionData *connect)
         write(connect->dataConnectFD, buffer, len);
     }
     write_message(connect->ConnectFD, MSG_226_TRANS_DONE);
+    return 1;
 }
 
-static void recv_file(const char *filename, struct ConnectionData *connect)
+static int recv_file(const char *filename, struct ConnectionData *connect)
 {
     int FD = 0;
-    if (connect->rest_position){
+    if (connect->rest_position)
+    {
         FD = open(filename, O_WRONLY | O_APPEND, S_IRWXU | S_IRWXG | S_IRWXO);
+        if (FD == -1)
+            return 0;
         lseek(FD, connect->rest_position, SEEK_SET);
         connect->rest_position = 0;
     }
-    else {
+    else
+    {
         FD = open(filename, O_WRONLY | O_CREAT, S_IRWXU | S_IRWXG | S_IRWXO);
+        if (FD == -1)
+            return 0;
     }
 
     char buffer[BUFFER_SIZE];
@@ -261,6 +273,7 @@ static void recv_file(const char *filename, struct ConnectionData *connect)
         write(FD, buffer, len);
     }
     write_message(connect->ConnectFD, MSG_226_TRANS_DONE);
+    return 1;
 }
 
 // Reference: [linux 下用 c 实现 ls -l 命令 - Ritchie丶 - 博客园](https://www.cnblogs.com/Ritchie/p/6272693.html)
@@ -298,10 +311,12 @@ static int send_ls(const char *dirname, struct ConnectionData *connect)
     }
 }
 
-static int get_absolute_path(char *virtual_path, char *absolute_path, struct ConnectionData *connect, int is_dir){
-    // TODO: out of length
+// get absolute path and virtual path, using connect->param
+static int get_absolute_path(char *virtual_path, char *absolute_path, struct ConnectionData *connect, int is_dir)
+{
     strcpy(virtual_path, connect->current_path);
-    if (connect->param){
+    if (connect->param)
+    {
         if (!push_path(virtual_path, connect->param, is_dir))
         {
             write_message(connect->ConnectFD, MSG_550_WRONG_PATH);
@@ -325,7 +340,9 @@ int RETR(struct ConnectionData *connect)
         return 0;
 
     char virtual_path[BUFFER_SIZE], absolute_path[BUFFER_SIZE];
-    if (!get_absolute_path(virtual_path, absolute_path, connect, 0)){
+    if (!get_absolute_path(virtual_path, absolute_path, connect, 0))
+    {
+        write_message_template(connect->ConnectFD, MSG_451_ACTION_FAIL, "error when processing path.");
         return 0;
     }
 
@@ -333,8 +350,7 @@ int RETR(struct ConnectionData *connect)
     stat(absolute_path, &s);
     if (!(s.st_mode & S_IFREG))
     {
-        // TODO: wrong message content
-        write_message(connect->ConnectFD, MSG_550_WRONG_PATH);
+        write_message_template(connect->ConnectFD, MSG_550_NOT_FILE, virtual_path);
         return 1;
     }
     else
@@ -347,7 +363,11 @@ int RETR(struct ConnectionData *connect)
         return 0;
     }
 
-    send_file(absolute_path, connect);
+    if (!send_file(absolute_path, connect))
+    {
+        write_message_template(connect->ConnectFD, MSG_451_ACTION_FAIL, "open file error.");
+        return 0;
+    }
 
     close_data_connection(connect);
     return 1;
@@ -359,7 +379,9 @@ int STOR(struct ConnectionData *connect)
         return 0;
 
     char virtual_path[BUFFER_SIZE], absolute_path[BUFFER_SIZE];
-    if (!get_absolute_path(virtual_path, absolute_path, connect, 0)){
+    if (!get_absolute_path(virtual_path, absolute_path, connect, 0))
+    {
+        write_message_template(connect->ConnectFD, MSG_451_ACTION_FAIL, "error when processing path.");
         return 0;
     }
 
@@ -370,7 +392,11 @@ int STOR(struct ConnectionData *connect)
         return 0;
     }
 
-    recv_file(absolute_path, connect);
+    if (!recv_file(absolute_path, connect))
+    {
+        write_message_template(connect->ConnectFD, MSG_451_ACTION_FAIL, "open file error.");
+        return 0;
+    }
 
     close_data_connection(connect);
 
@@ -390,12 +416,12 @@ int TYPE(struct ConnectionData *connect)
 
     if (strcmp("I", connect->param))
     {
-        write_message_template(connect->ConnectFD, MSG_504_TEMPLATE, "Only support TYPE I");
+        write_message(connect->ConnectFD, MSG_504_TYPE_ERR);
         return 1;
     }
     else
     {
-        write_message_template(connect->ConnectFD, MSG_200_TEMPLATE, "Type set to I.");
+        write_message_by_code(connect->ConnectFD, 200, "Type set to I.");
         return 1;
     }
 }
@@ -405,6 +431,7 @@ int QUIT(struct ConnectionData *connect)
     write_message(connect->ConnectFD, MSG_221_GOODBYE);
     return 1;
 }
+
 int ABOR(struct ConnectionData *connect)
 {
     QUIT(connect);
@@ -417,27 +444,31 @@ int MKD(struct ConnectionData *connect)
         return 0;
 
     char virtual_path[BUFFER_SIZE], absolute_path[BUFFER_SIZE];
-    if (!get_absolute_path(virtual_path, absolute_path, connect, 1)){
+    if (!get_absolute_path(virtual_path, absolute_path, connect, 1))
+    {
+        write_message_template(connect->ConnectFD, MSG_451_ACTION_FAIL, "error when processing path.");
         return 0;
     }
 
     if (mkdir(absolute_path, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH))
     {
-        // TODO: file already exists: wrong message: "550 No such file or directory."
-        write_message(connect->ConnectFD, MSG_550_WRONG_PATH);
+        write_message_by_code(connect->ConnectFD, 550, "Directory creation failed.");
         return 1;
     }
 
-    write_message_template(connect->ConnectFD, MSG_257_MKD, virtual_path);
+    write_message_template(connect->ConnectFD, MSG_257_MKD_OK, virtual_path);
     return 1;
 }
+
 int CWD(struct ConnectionData *connect)
 {
     if (!check_userstate(connect))
         return 0;
 
     char virtual_path[BUFFER_SIZE], absolute_path[BUFFER_SIZE];
-    if (!get_absolute_path(virtual_path, absolute_path, connect, 1)){
+    if (!get_absolute_path(virtual_path, absolute_path, connect, 1))
+    {
+        write_message_template(connect->ConnectFD, MSG_451_ACTION_FAIL, "error when processing path.");
         return 0;
     }
 
@@ -451,24 +482,28 @@ int CWD(struct ConnectionData *connect)
 
     strcpy(connect->current_path, virtual_path);
 
-    write_message_template(connect->ConnectFD, MSG_250_CWD, connect->current_path);
+    write_message_template(connect->ConnectFD, MSG_250_CWD_OK, connect->current_path);
     return 1;
 }
+
 int PWD(struct ConnectionData *connect)
 {
     if (!check_userstate(connect))
         return 0;
 
-    write_message_template(connect->ConnectFD, MSG_257_PWD, connect->current_path);
+    write_message_template(connect->ConnectFD, MSG_257_PWD_OK, connect->current_path);
     return 1;
 }
+
 int LIST(struct ConnectionData *connect)
 {
     if (!check_userstate(connect))
         return 0;
 
     char virtual_path[BUFFER_SIZE], absolute_path[BUFFER_SIZE];
-    if (!get_absolute_path(virtual_path, absolute_path, connect, 1)){
+    if (!get_absolute_path(virtual_path, absolute_path, connect, 1))
+    {
+        write_message_template(connect->ConnectFD, MSG_451_ACTION_FAIL, "error when processing path.");
         return 0;
     }
 
@@ -491,7 +526,7 @@ int LIST(struct ConnectionData *connect)
 
     if (!send_ls(absolute_path, connect))
     {
-        write_message(connect->ConnectFD, MSG_550_WRONG_PATH);
+        write_message_template(connect->ConnectFD, MSG_451_ACTION_FAIL, "unknown.");
         close_data_connection(connect);
         return 1;
     }
@@ -501,13 +536,16 @@ int LIST(struct ConnectionData *connect)
         return 1;
     }
 }
+
 int RMD(struct ConnectionData *connect)
 {
     if (!check_userstate(connect))
         return 0;
 
     char virtual_path[BUFFER_SIZE], absolute_path[BUFFER_SIZE];
-    if (!get_absolute_path(virtual_path, absolute_path, connect, 1)){
+    if (!get_absolute_path(virtual_path, absolute_path, connect, 1))
+    {
+        write_message_template(connect->ConnectFD, MSG_451_ACTION_FAIL, "error when processing path.");
         return 0;
     }
 
@@ -519,28 +557,33 @@ int RMD(struct ConnectionData *connect)
         return 1;
     }
 
-    if (startswith(connect->current_path, virtual_path)){ // when remove current directory
-        write_message(connect->ConnectFD, MSG_550_WRONG_PATH);
+    if (startswith(connect->current_path, virtual_path))
+    {
+        // when remove current directory
+        write_message_by_code(connect->ConnectFD, 550, "Cannot remove current directory.");
         return 1;
     }
 
     if (!rmdir(absolute_path))
-	{
-		write_message_template(connect->ConnectFD, MSG_250_RMD, virtual_path);
-	}
-	else
-	{
-		write_message(connect->ConnectFD, MSG_550_WRONG_PATH);
-	}
+    {
+        write_message_template(connect->ConnectFD, MSG_250_RMD_OK, virtual_path);
+    }
+    else
+    {
+        write_message_template(connect->ConnectFD, MSG_451_ACTION_FAIL, "unknown.");
+    }
     return 1;
 }
 
-int DELE(struct ConnectionData *connect){
+int DELE(struct ConnectionData *connect)
+{
     if (!check_userstate(connect))
         return 0;
 
     char virtual_path[BUFFER_SIZE], absolute_path[BUFFER_SIZE];
-    if (!get_absolute_path(virtual_path, absolute_path, connect, 0)){
+    if (!get_absolute_path(virtual_path, absolute_path, connect, 0))
+    {
+        write_message_template(connect->ConnectFD, MSG_451_ACTION_FAIL, "error when processing path.");
         return 0;
     }
 
@@ -548,19 +591,18 @@ int DELE(struct ConnectionData *connect){
     stat(absolute_path, &s);
     if (!(s.st_mode & S_IFREG))
     {
-        // TODO: wrong message content
-        write_message(connect->ConnectFD, MSG_550_WRONG_PATH);
+        write_message_template(connect->ConnectFD, MSG_550_NOT_FILE, virtual_path);
         return 1;
     }
 
     if (!remove(absolute_path))
-	{
-		write_message_template(connect->ConnectFD, MSG_250_DELE_SUCC, virtual_path);
-	}
-	else
-	{
-		write_message(connect->ConnectFD, MSG_550_WRONG_PATH);
-	}
+    {
+        write_message_template(connect->ConnectFD, MSG_250_DELE_OK, virtual_path);
+    }
+    else
+    {
+        write_message_template(connect->ConnectFD, MSG_451_ACTION_FAIL, "unknown.");
+    }
 
     return 1;
 }
@@ -571,7 +613,9 @@ int RNFR(struct ConnectionData *connect)
         return 0;
 
     char virtual_path[BUFFER_SIZE], absolute_path[BUFFER_SIZE];
-    if (!get_absolute_path(virtual_path, absolute_path, connect, 0)){
+    if (!get_absolute_path(virtual_path, absolute_path, connect, 0))
+    {
+        write_message_template(connect->ConnectFD, MSG_451_ACTION_FAIL, "error when processing path.");
         return 0;
     }
 
@@ -585,49 +629,58 @@ int RNFR(struct ConnectionData *connect)
 
     connect->RNFR_state = RNFR_READY;
     strcpy(connect->RNFR_target, absolute_path);
-    write_message(connect->ConnectFD, MSG_350_RNFR);
+    write_message(connect->ConnectFD, MSG_350_REQUIRE_MORE);
     return 1;
 }
+
 int RNTO(struct ConnectionData *connect)
 {
     if (!check_userstate(connect))
         return 0;
 
-    if (connect->RNFR_state != RNFR_READY){
+    if (connect->RNFR_state != RNFR_READY)
+    {
         write_message(connect->ConnectFD, MSG_503_RNTO_REQ_RNFR);
         return 1;
-    }else{
+    }
+    else
+    {
         connect->RNFR_state = NO_RNFR;
     }
 
     char virtual_path[BUFFER_SIZE], absolute_path[BUFFER_SIZE];
-    if (!get_absolute_path(virtual_path, absolute_path, connect, 0)){
+    if (!get_absolute_path(virtual_path, absolute_path, connect, 0))
+    {
+        write_message_template(connect->ConnectFD, MSG_451_ACTION_FAIL, "error when processing path.");
         return 0;
     }
 
     if (rename(connect->RNFR_target, absolute_path))
-	{
-		write_message(connect->ConnectFD, MSG_451_RNTO_ERR);
-	}
-	else
-	{
-		write_message(connect->ConnectFD, MSG_250_RNTO_SUCC);
-	}
+    {
+        write_message_template(connect->ConnectFD, MSG_451_ACTION_FAIL, "unknown.");
+    }
+    else
+    {
+        write_message(connect->ConnectFD, MSG_250_RNTO_OK);
+    }
 
     return 1;
 }
+
 int REST(struct ConnectionData *connect)
 {
     if (!check_userstate(connect))
         return 0;
 
     int tmp;
-    if (sscanf(connect->param, "%d", &tmp)){
+    if (sscanf(connect->param, "%d", &tmp))
+    {
         connect->rest_position = tmp;
-        // TODO: message content
-        write_message(connect->ConnectFD, MSG_350_RNFR); 
-    }else{
-		write_message_template(connect->ConnectFD, MSG_501_TEMPLATE, "Syntax error in parameters or arguments.");
+        write_message(connect->ConnectFD, MSG_350_REQUIRE_MORE);
+    }
+    else
+    {
+        write_message(connect->ConnectFD, MSG_501_PARAM_INVALID);
     }
 
     return 1;

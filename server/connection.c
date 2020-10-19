@@ -44,10 +44,10 @@ static int parse_request(char *buffer, struct ConnectionData *connect)
     }
 
     int buffer_len = strlen(buffer);
-    buffer[buffer_len - 2] = '\0';  // remove '\r\n'
+    buffer[buffer_len - 2] = '\0'; // remove '\r\n'
     if (space_pos != -1)
     {
-        buffer[space_pos] = '\0';   // split verb and param
+        buffer[space_pos] = '\0'; // split verb and param
         connect->verb = buffer;
         connect->param = buffer + space_pos + 1;
     }
