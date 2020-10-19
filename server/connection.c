@@ -21,8 +21,15 @@ int write_message(int ConnectFD, const char *msg)
 
 int write_message_template(int ConnectFD, const char *template, const char *content)
 {
-    char msg_buffer[MAX_MSG_LEN];
+    char msg_buffer[BUFFER_SIZE];
     sprintf(msg_buffer, template, content);
+    return write_message(ConnectFD, msg_buffer);
+}
+
+int write_message_by_code(int ConnectFD, int code, const char *content)
+{
+    char msg_buffer[BUFFER_SIZE];
+    sprintf(msg_buffer, "%d %s\r\n", code, content);
     return write_message(ConnectFD, msg_buffer);
 }
 
@@ -37,10 +44,10 @@ static int parse_request(char *buffer, struct ConnectionData *connect)
     }
 
     int buffer_len = strlen(buffer);
-    buffer[buffer_len - 2] = '\0';
+    buffer[buffer_len - 2] = '\0';  // remove '\r\n'
     if (space_pos != -1)
     {
-        buffer[space_pos] = '\0';
+        buffer[space_pos] = '\0';   // split verb and param
         connect->verb = buffer;
         connect->param = buffer + space_pos + 1;
     }
@@ -89,19 +96,21 @@ void *connection(void *arg)
         }
         // TODO: check buffer endswith \r\n
         connect.verb_idx = parse_request(buffer, &connect);
-        
+
+        // TODO: remove all printf
         printf("%d\n%s\n%s\n", connect.verb_idx, connect.verb, connect.param);
 
         if (connect.verb_idx == -1)
         {
+            write_message(ConnectFD, MSG_500_CMD_INVALID);
             perror("invalid verb");
-            break;
+            // break;
         }
         if (VERB_REQUIRE_PARAM[connect.verb_idx] && !connect.param)
         {
-            // TODO: print specific verb
+            write_message(ConnectFD, MSG_501_PARAM_INVALID);
             perror("request need a parameter");
-            break;
+            // break;
         }
 
         VERB_FUNCS[connect.verb_idx](&connect);

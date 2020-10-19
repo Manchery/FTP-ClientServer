@@ -20,28 +20,31 @@ enum RNFRState{
 };
 
 struct ConnectionData{
-    int ConnectFD;
+    int ConnectFD;                      // connect socket
     int verb_idx;
-    const char* verb;
-    const char* param;
+    const char* verb;                   // command verb
+    const char* param;                  // command parameters
 
     enum UserState user_state;
 
     enum DataMode data_mode;
     struct sockaddr_in data_address;
-    int dataSocketFD;
-    int dataConnectFD;
+    int dataSocketFD;                   // data listen socket
+    int dataConnectFD;                  // data connect socket
 
-    char current_path[BUFFER_SIZE];
+    char current_path[BUFFER_SIZE];     // virtual: under ROOT_DIR
 
+    // for rename
     enum RNFRState RNFR_state;
     char RNFR_target[BUFFER_SIZE];
 
+    // for resume transimission
     int rest_position;
 };
 
 int write_message(int ConnectFD, const char *msg);
 int write_message_template(int ConnectFD, const char *template, const char *content);
+int write_message_by_code(int ConnectFD, int code, const char *content);
 void *connection(void *arg);
 
 #endif
