@@ -1,4 +1,4 @@
-#include "request.h"
+#include "commands.h"
 #include "connection.h"
 #include "utils.h"
 #include <sys/types.h>
@@ -129,36 +129,6 @@ int PORT(struct ConnectionData *connect)
         write_message(connect->ConnectFD, msg_buffer);
     }
     return 1;
-}
-
-// Reference: [c++ - Get the IP address of the machine - Stack Overflow](https://stackoverflow.com/questions/212528/get-the-ip-address-of-the-machine)
-void GetPrimaryIp(char *buffer, size_t buflen)
-{
-    assert(buflen >= 16);
-
-    int sock = socket(AF_INET, SOCK_DGRAM, 0);
-    assert(sock != -1);
-
-    const char *kGoogleDnsIp = "8.8.8.8";
-    uint16_t kDnsPort = 53;
-    struct sockaddr_in serv;
-    memset(&serv, 0, sizeof(serv));
-    serv.sin_family = AF_INET;
-    serv.sin_addr.s_addr = inet_addr(kGoogleDnsIp);
-    serv.sin_port = htons(kDnsPort);
-
-    int err = connect(sock, (const struct sockaddr *)&serv, sizeof(serv));
-    assert(err != -1);
-
-    struct sockaddr_in name;
-    socklen_t namelen = sizeof(name);
-    err = getsockname(sock, (struct sockaddr *)&name, &namelen);
-    assert(err != -1);
-
-    const char *p = inet_ntop(AF_INET, &name.sin_addr, buffer, buflen);
-    assert(p);
-
-    close(sock);
 }
 
 int PASV(struct ConnectionData *connect)
@@ -346,7 +316,7 @@ static int get_absolute_path(char *virtual_path, char *absolute_path, struct Con
         }
     }
 
-    strcpy(absolute_path, ROOT_DIR);
+    strcpy(absolute_path, connect->root_path);
     if (!push_path(absolute_path, virtual_path + 1, is_dir))
     {
         write_message(connect->ConnectFD, MSG_550_WRONG_PATH);

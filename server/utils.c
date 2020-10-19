@@ -1,8 +1,22 @@
 #include "utils.h"
+#include "commands.h"
 
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <ifaddrs.h>
+#include <unistd.h>
+
+#include <assert.h>
 #include <string.h>
+#include <ctype.h>
 
-#include "const.h"
+void strupp(char *beg)
+{
+    while (*beg)
+        *beg = toupper(*beg), beg++;
+}
 
 int startswith(const char *str, char *pattern)
 {
@@ -14,6 +28,7 @@ int startswith(const char *str, char *pattern)
             return 0;
     return 1;
 }
+
 int endswith(const char *str, char *pattern)
 {
     int n = strlen(str), m = strlen(pattern);
@@ -180,4 +195,36 @@ char *gid_to_name(gid_t gid)
     }
     else
         return grp_ptr->gr_name;
+}
+
+// ---------------- Network --------------------
+
+// Reference: [c++ - Get the IP address of the machine - Stack Overflow](https://stackoverflow.com/questions/212528/get-the-ip-address-of-the-machine)
+void GetPrimaryIp(char *buffer, size_t buflen)
+{
+    assert(buflen >= 16);
+
+    int sock = socket(AF_INET, SOCK_DGRAM, 0);
+    assert(sock != -1);
+
+    const char *kGoogleDnsIp = "8.8.8.8";
+    uint16_t kDnsPort = 53;
+    struct sockaddr_in serv;
+    memset(&serv, 0, sizeof(serv));
+    serv.sin_family = AF_INET;
+    serv.sin_addr.s_addr = inet_addr(kGoogleDnsIp);
+    serv.sin_port = htons(kDnsPort);
+
+    int err = connect(sock, (const struct sockaddr *)&serv, sizeof(serv));
+    assert(err != -1);
+
+    struct sockaddr_in name;
+    socklen_t namelen = sizeof(name);
+    err = getsockname(sock, (struct sockaddr *)&name, &namelen);
+    assert(err != -1);
+
+    const char *p = inet_ntop(AF_INET, &name.sin_addr, buffer, buflen);
+    assert(p);
+
+    close(sock);
 }

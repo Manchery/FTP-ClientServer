@@ -48,7 +48,4 @@ struct ConnectionData;
 typedef int (*verb_func)(struct ConnectionData *);
 extern const verb_func VERB_FUNCS[];
 
-extern char ROOT_DIR[BUFFER_SIZE];
-extern int FTP_SERVER_PORT;
-
 #endif

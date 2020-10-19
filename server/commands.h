@@ -1,6 +1,7 @@
 #ifndef REQUEST
 #define REQUEST
 
+#include "const.h"
 #include "connection.h"
 
 int USER(struct ConnectionData *connect);

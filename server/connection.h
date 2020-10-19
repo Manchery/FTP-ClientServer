@@ -1,7 +1,7 @@
 #ifndef CONNECTION
 #define CONNECTION
 
-#include "const.h"
+#include "commands.h"
 #include <netinet/in.h>
 
 enum UserState {
@@ -32,6 +32,7 @@ struct ConnectionData{
     int dataSocketFD;
     int dataConnectFD;
 
+    char root_path[BUFFER_SIZE];
     char current_path[BUFFER_SIZE];
 
     enum RNFRState RNFR_state;

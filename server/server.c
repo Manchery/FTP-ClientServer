@@ -1,4 +1,6 @@
 // Reference: https://en.wikipedia.org/wiki/Berkeley_sockets#Server
+#include "connection.h"
+#include "commands.h"
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -12,10 +14,9 @@
 #include <signal.h>
 #include <pthread.h>
 
-#include "connection.h"
-#include "const.h"
-
 int SocketFD;
+int ftp_server_port=21;
+char ftp_root_dir[BUFFER_SIZE] = "/tmp/";
 
 void SIGINT_handler(int x)
 {
@@ -30,11 +31,11 @@ int main(int argc, char **argv)
     {
         if (!strcmp(argv[i], "-port"))
         {
-            FTP_SERVER_PORT = atoi(argv[i + 1]);
+            ftp_server_port = atoi(argv[i + 1]);
         }
         if (!strcmp(argv[i], "-root"))
         {
-            strcpy(ROOT_DIR, argv[i + 1]);
+            strcpy(ftp_root_dir, argv[i + 1]);
         }
     }
 
@@ -49,7 +50,7 @@ int main(int argc, char **argv)
     memset(&sa, 0, sizeof sa);
 
     sa.sin_family = AF_INET;
-    sa.sin_port = htons(FTP_SERVER_PORT);
+    sa.sin_port = htons(ftp_server_port);
     sa.sin_addr.s_addr = htonl(INADDR_ANY);
 
     int reuse = 1;
@@ -82,8 +83,14 @@ int main(int argc, char **argv)
             exit(EXIT_FAILURE);
         }
 
+        struct ConnectionData connect;
+        memset(&connect, 0, sizeof(connect));
+        connect.ConnectFD = ConnectFD;
+        strcpy(connect.current_path, "/");
+        strcpy(connect.root_path, ftp_root_dir);
+
         pthread_t thread_id;
-        pthread_create(&thread_id, NULL, connection, (void *)&ConnectFD);
+        pthread_create(&thread_id, NULL, connection, (void *)&connect);
     }
 
     close(SocketFD);

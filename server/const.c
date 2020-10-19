@@ -1,6 +1,6 @@
 #include "const.h"
 #include "connection.h"
-#include "request.h"
+#include "commands.h"
 
 const char MSG_200_PORT_OK[] = "200 PORT command successful.\r\n";
 const char MSG_227_PASV_OK[] = "227 Entering Passive Mode (%s,%d,%d)\r\n";
@@ -78,6 +78,3 @@ const verb_func VERB_FUNCS[] = {
     RNTO,
     REST,
     DELE};
-
-char ROOT_DIR[BUFFER_SIZE] = "/tmp/";
-int FTP_SERVER_PORT=21;
