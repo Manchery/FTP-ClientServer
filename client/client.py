@@ -20,6 +20,7 @@ class AbstractDataThread(QThread):
     responseGet = pyqtSignal(str)
     dataProgress = pyqtSignal(int)
     finish = pyqtSignal()
+    failed = pyqtSignal()
 
     def __init__(self, ftp, remote_file, local_file, parent=None, rest=0):
         super().__init__(parent)
@@ -42,10 +43,13 @@ class DownloadThread(AbstractDataThread):
         if self.rest != 0:
             self.ftp.REST(self.rest)
 
-        self.ftp.RETR(self.remote_file, self.local_file, self.rest != 0)
+        retr_res = self.ftp.RETR(self.remote_file, self.local_file, self.rest != 0)
         self.ftp.QUIT()
         self.ftp.close_connect_socket()
-        self.finish.emit()
+        if '226' in retr_res:
+            self.finish.emit()
+        else:
+            self.failed.emit()
 
 
 class UploadThread(AbstractDataThread):
@@ -57,11 +61,14 @@ class UploadThread(AbstractDataThread):
         if self.rest != 0:
             self.ftp.REST(self.rest)
 
-        self.ftp.STOR(self.remote_file, self.local_file,
+        stor_res = self.ftp.STOR(self.remote_file, self.local_file,
                       self.rest != 0, self.rest)
         self.ftp.QUIT()
         self.ftp.close_connect_socket()
-        self.finish.emit()
+        if '226' in stor_res:
+            self.finish.emit()
+        else:
+            self.failed.emit()
 
 
 # parent class for LocalFileWidget and RemoteFileWidget
@@ -615,6 +622,11 @@ class MainWindow(QWidget):
             item.setText(5, 'Done')
             self.local.updateLocalPath(self.local.cwd)
         downloadThread.finish.connect(downloadDone)
+        def downloadFailed():
+            item.setText(5, 'Failed')
+            self.local.updateLocalPath(self.local.cwd)
+        downloadThread.failed.connect(downloadFailed)
+
         downloadThread.start()
 
     def cont_download(self):
@@ -664,6 +676,11 @@ class MainWindow(QWidget):
             item.setText(5, 'Done')
             self.local.updateLocalPath(self.local.cwd)
         downloadThread.finish.connect(downloadDone)
+        def downloadFailed():
+            item.setText(5, 'Failed')
+            self.local.updateLocalPath(self.local.cwd)
+        downloadThread.failed.connect(downloadFailed)
+
         downloadThread.start()
 
     def upload(self):
@@ -706,6 +723,11 @@ class MainWindow(QWidget):
             item.setText(5, 'Done')
             self.remote.updateRemotePath(self.remote.cwd)
         uploadThread.finish.connect(uploadDone)
+        def uploadFailed():
+            item.setText(5, 'Failed')
+            self.remote.updateRemotePath(self.remote.cwd)
+        uploadThread.failed.connect(uploadFailed)
+
         uploadThread.start()
 
     def cont_upload(self):
@@ -754,6 +776,11 @@ class MainWindow(QWidget):
             item.setText(5, 'Done')
             self.remote.updateRemotePath(self.remote.cwd)
         uploadThread.finish.connect(uploadDone)
+        def uploadFailed():
+            item.setText(5, 'Failed')
+            self.remote.updateRemotePath(self.remote.cwd)
+        uploadThread.failed.connect(uploadFailed)
+        
         uploadThread.start()
 
     # --------------------- GUI -----------------------
