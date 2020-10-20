@@ -17,12 +17,6 @@
 
 int SocketFD;
 
-void SIGINT_handler(int x)
-{
-    close(SocketFD);
-    exit(EXIT_SUCCESS);
-}
-
 int main(int argc, char **argv)
 {
     // check argvs
@@ -69,7 +63,7 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    signal(SIGINT, SIGINT_handler);
+    signal(SIGPIPE, SIG_IGN);
 
     for (;;)
     {

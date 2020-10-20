@@ -239,7 +239,10 @@ static int send_file(const char *filename, struct ConnectionData *connect)
         int len = read(FD, buffer, BUFFER_SIZE);
         if (!len)
             break;
-        write(connect->dataConnectFD, buffer, len);
+        if (write(connect->dataConnectFD, buffer, len)==-1)
+        {
+            return 0;
+        }
     }
     write_message(connect->ConnectFD, MSG_226_TRANS_DONE);
     return 1;
