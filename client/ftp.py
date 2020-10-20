@@ -234,15 +234,16 @@ class FTPClient(QObject):
         self.connect_socket.sendall(req)
         res = self.connect_socket_receive()
         self.responseGet.emit(res)
+        
+        if res.startswith('150'):
+            with open(local_file, 'wb' if not cont else 'ab') as f:
+                self.data_socket_receive(f)
 
-        with open(local_file, 'wb' if not cont else 'ab') as f:
-            self.data_socket_receive(f)
+            self.close_data_socket()
 
-        self.close_data_socket()
-
-        new_res = self.connect_socket_receive()
-        res += '\n' + new_res
-        self.responseGet.emit(new_res)
+            new_res = self.connect_socket_receive()
+            res += '\n' + new_res
+            self.responseGet.emit(new_res)
 
         return res
 
@@ -256,16 +257,17 @@ class FTPClient(QObject):
         res = self.connect_socket_receive()
         self.responseGet.emit(res)
 
-        with open(local_file, 'rb') as f:
-            if cont:
-                f.seek(rest)
-            self.data_socket_send(f)
+        if res.startswith('150'):
+            with open(local_file, 'rb') as f:
+                if cont:
+                    f.seek(rest)
+                self.data_socket_send(f)
 
-        self.close_data_socket()
+            self.close_data_socket()
 
-        new_res = self.connect_socket_receive()
-        res += '\n' + new_res
-        self.responseGet.emit(new_res)
+            new_res = self.connect_socket_receive()
+            res += '\n' + new_res
+            self.responseGet.emit(new_res)
 
         return res
 
