@@ -122,14 +122,12 @@ class FTPClient(QObject):
         req = 'SYST\r\n'.encode()
         self.connect_socket.sendall(req)
         res = self.connect_socket_receive()
-
         return res
 
     def TYPE(self, mode='I'):
         req = ('TYPE %s\r\n' % mode).encode()
         self.connect_socket.sendall(req)
         res = self.connect_socket_receive()
-
         return res
 
     def PORT(self):
@@ -144,18 +142,18 @@ class FTPClient(QObject):
         self.data_socket.listen(1)
         req = ('PORT %s,%d,%d\r\n' %
                (ip.replace('.', ','), port//256, port % 256)).encode()
-        print(req)
+        # print(req)
         self.connect_socket.sendall(req)
         res = self.connect_socket_receive()
         # self.responseGet.emit(res)
-        print(res)
+        # print(res)
         return res
 
     def PASV(self):
         req = 'PASV\r\n'.encode()
         self.connect_socket.sendall(req)
         res = self.connect_socket_receive()
-        print(res)
+        # print(res)
 
         matched = re.search('(\d*),(\d*),(\d*),(\d*),(\d*),(\d*)', res).group()
         matched = matched.split(',')
@@ -166,7 +164,7 @@ class FTPClient(QObject):
             self.data_socket = socket.socket(
                 socket.AF_INET, socket.SOCK_STREAM)
             self.data_socket.connect((ip, port))
-            print(ip, port)
+            # print(ip, port)
         return res
 
     def PWD(self):
@@ -223,14 +221,15 @@ class FTPClient(QObject):
 
         res += '\n' + self.connect_socket_receive()
 
+        # last one after split is ''
         return res, data.decode('utf-8').split('\r\n')[:-1]
 
     def RETR(self, remote_file, local_file, cont=False):
-        print(remote_file, local_file)
+        # print(remote_file, local_file)
         self.open_data_socket()
 
         req = ('RETR %s\r\n' % remote_file).encode()
-        print(req)
+        # print(req)
         self.connect_socket.sendall(req)
         res = self.connect_socket_receive()
         self.responseGet.emit(res)
@@ -247,11 +246,11 @@ class FTPClient(QObject):
         return res
 
     def STOR(self, remote_file, local_file, cont=False, rest=0):
-        print(remote_file, local_file)
+        # print(remote_file, local_file)
         self.open_data_socket()
 
         req = ('STOR %s\r\n' % remote_file).encode()
-        print(req)
+        # print(req)
         self.connect_socket.sendall(req)
         res = self.connect_socket_receive()
         self.responseGet.emit(res)
@@ -271,7 +270,7 @@ class FTPClient(QObject):
 
     def REST(self, rest):
         req = ('REST %d\r\n' % rest).encode()
-        print(req)
+        # print(req)
         self.connect_socket.sendall(req)
         res = self.connect_socket_receive()
         self.responseGet.emit(res)

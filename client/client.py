@@ -9,12 +9,13 @@ from dialog import inputDialog, confirmDialog
 from threading import Thread
 from copy import deepcopy
 import re
+import time
 
-from log import Window
 import utils
 from functools import partial
 
 
+# parent class for DownloadThread and UploadThread
 class AbstractDataThread(QThread):
     responseGet = pyqtSignal(str)
     dataProgress = pyqtSignal(int)
@@ -59,7 +60,10 @@ class UploadThread(AbstractDataThread):
         self.finish.emit()
 
 
+# parent class for LocalFileWidget and RemoteFileWidget
 class AbstractFileWidget(QWidget):
+    selectedFileChanged = pyqtSignal()
+
     def __init__(self, parent=None):
         super(AbstractFileWidget, self).__init__(parent)
         self.parent = parent
@@ -99,6 +103,8 @@ class AbstractFileWidget(QWidget):
         self.setLayout(self.mainLayout)
 
         self.files.currentItemChanged.connect(self.currentFileChanged)
+        self.files.currentItemChanged.connect(
+            self.selectedFileChanged)  # signal
 
         self.cwd = ''
 
@@ -121,6 +127,22 @@ class AbstractFileWidget(QWidget):
         self.pathEdit.setText(t)
         self.pathEdit.setHidden(False)
 
+    def selectedIsFile(self):
+        if self.files.currentItem() is not None:
+            if self.files.currentItem().text(0) == '..':
+                return False
+            return self.files.currentItem().text(2)[0] != 'd'
+        else:
+            return False
+
+    def selectedIsDir(self):
+        if self.files.currentItem() is not None:
+            if self.files.currentItem().text(0) == '..':
+                return True
+            return self.files.currentItem().text(2)[0] == 'd'
+        else:
+            return False
+
 
 class LocalFileWidget(AbstractFileWidget):
     uploadClicked = pyqtSignal()
@@ -130,7 +152,7 @@ class LocalFileWidget(AbstractFileWidget):
         super(LocalFileWidget, self).__init__(parent)
 
         self.pathLabel.setText('Local Path')
-        self.files.setHeaderLabels(['Name', 'Size', 'Mode', 'Modified Time'])
+        self.files.setHeaderLabels(['Name', 'Size', 'Mode', 'Last Time'])
 
         self.upload_button = QPushButton(text='Upload')
         self.buttonLayout.addWidget(self.upload_button)
@@ -163,6 +185,8 @@ class LocalFileWidget(AbstractFileWidget):
 
     def updateLocalPath(self, newCwd=None):
         if newCwd is not None:
+            if not os.path.isdir(newCwd):
+                return
             self.cwd = newCwd
         self.pathEditSetText(self.cwd)
 
@@ -170,6 +194,7 @@ class LocalFileWidget(AbstractFileWidget):
 
         self.completeWordList = []
 
+        # back to parent dir
         if self.cwd != '/':
             item = QTreeWidgetItem()
             icon = QIcon('icons/folder.png')
@@ -180,6 +205,7 @@ class LocalFileWidget(AbstractFileWidget):
             self.addItem(item)
 
         for f in os.listdir(self.cwd):
+            # hidden files
             if f.startswith('.'):
                 continue
 
@@ -214,9 +240,8 @@ class RemoteFileWidget(AbstractFileWidget):
 
         self.pathLabel.setText('Remote Path')
         self.files.setHeaderLabels(
-            ['Name', 'Size', 'Mode', 'Modified Time', 'Owner/Group'])
+            ['Name', 'Size', 'Mode', 'Last Time', 'Owner/Group'])
 
-        # TODO: button enable/disable
         self.download_button = QPushButton(text='Download')
         self.buttonLayout.addWidget(self.download_button)
         self.cont_download_button = QPushButton(text='Continue To Download')
@@ -255,18 +280,25 @@ class RemoteFileWidget(AbstractFileWidget):
             self.updateRemotePath(self.cwd)
 
     def renameButtonClicked(self):
+        if self.files.currentItem() is None:
+            return
+
         old_name = self.files.currentItem().text(0)
         new_name = inputDialog('Rename', 'New name',
                                default=old_name, parent=self)
         if new_name and new_name != old_name:
             rnfr_res = self.ftp.RNFR(old_name)
-            self.parent.log(rnfr_res)
-            rnto_res = self.ftp.RNTO(new_name)
-            self.parent.log(rnto_res)
-            self.updateRemotePath(self.cwd)
+            if rnfr_res.startswith('350'):
+                self.parent.log(rnfr_res)
+                rnto_res = self.ftp.RNTO(new_name)
+                self.parent.log(rnto_res)
+                self.updateRemotePath(self.cwd)
 
     def rmdButtonClicked(self):
-        if confirmDialog('Remove Dir', 'Sure?', parent=self):
+        if self.files.currentItem() is None:
+            return
+
+        if confirmDialog('Remove', 'Sure?', parent=self):
             if self.files.currentItem().text(2).startswith('d'):
                 rmd_res = self.ftp.RMD(self.files.currentItem().text(0))
                 self.parent.log(rmd_res)
@@ -284,8 +316,10 @@ class RemoteFileWidget(AbstractFileWidget):
 
     def updateRemotePath(self, newCwd):
         if self.cwd != newCwd:
-            self.parent.log(self.ftp.CWD(newCwd))
-            self.cwd = newCwd
+            cwd_res = self.ftp.CWD(newCwd)
+            self.parent.log(cwd_res)
+            if cwd_res.startswith('250'):
+                self.cwd = newCwd
 
         self.pathEditSetText(self.cwd)
 
@@ -296,6 +330,7 @@ class RemoteFileWidget(AbstractFileWidget):
         self.files.clear()
         self.completeWordList = []
 
+        # back to parent dir
         if self.cwd != '/':
             item = QTreeWidgetItem()
             icon = QIcon('icons/folder.png')
@@ -331,6 +366,14 @@ class RemoteFileWidget(AbstractFileWidget):
 
 
 class MainWindow(QWidget):
+    COLORS = {
+        '1': 'darkGreen',
+        '2': 'green',
+        '3': 'blue',
+        '4': 'orange',
+        '5': 'red',
+    }
+
     def __init__(self, app, parent=None):
         super(MainWindow, self).__init__(parent)
 
@@ -346,14 +389,26 @@ class MainWindow(QWidget):
 
         self.createGui()
 
-        # debug
-        # self.hostEdit.setText('59.66.136.21')
-        # self.userEdit.setText('ssast')
-        # self.passwordEdit.setText('ssast')
+        self.all_buttons = [
+            self.local.upload_button,
+            self.local.cont_upload_button,
+            self.remote.download_button,
+            self.remote.cont_download_button,
+            self.remote.mkd_button,
+            self.remote.rename_button,
+            self.remote.rmd_button
+        ]
+        for b in self.all_buttons:
+            b.setDisabled(True)
 
-        self.hostEdit.setText('192.168.98.132')
-        self.userEdit.setText('anonymous')
+        # debug
+        self.hostEdit.setText('59.66.136.21')
+        self.userEdit.setText('ssast')
         self.passwordEdit.setText('ssast')
+
+        # self.hostEdit.setText('192.168.98.132')
+        # self.userEdit.setText('anonymous')
+        # self.passwordEdit.setText('ssast')
         # debug end
 
         self.connectButton.clicked.connect(self.connectSwitch)
@@ -364,9 +419,20 @@ class MainWindow(QWidget):
         self.local.uploadClicked.connect(self.upload)
         self.local.contUploadClicked.connect(self.cont_upload)
 
+        self.local.selectedFileChanged.connect(self.selectedFileChanged)
+        self.remote.selectedFileChanged.connect(self.selectedFileChanged)
+
     def log(self, log_str):
         self.messages.setHidden(True)
-        self.messages.append(log_str.strip())
+
+        for l in log_str.strip().split('\n'):
+            if len(l) == 0:
+                continue
+            color = self.COLORS.get(l[0], 'black')
+            s = '%s <font color="%s">%s</font>' % (time.strftime(
+                "%Y-%m-%d %H:%M:%S", time.localtime()), color, l)
+            self.messages.append(s)
+
         self.messages.setHidden(False)
 
     def dataModeSwitch(self):
@@ -387,36 +453,96 @@ class MainWindow(QWidget):
             password = self.passwordEdit.text()
             port = int(self.portEdit.text())
 
-            self.log(self.ftp.open_connect_socket(host, port))
-            self.log(self.ftp.USER(username))
-            self.log(self.ftp.PASS(password))
-            self.log(self.ftp.SYST())
-            self.log(self.ftp.TYPE())
+            connect_res = self.ftp.open_connect_socket(host, port)
+            self.log(connect_res)
 
-            pwd_res = self.ftp.PWD()
-            print(pwd_res)
-            self.log(pwd_res)
-            cwd = re.search('\".*\"', pwd_res).group()[1:-1]
-            self.remote.cwd = cwd
-            self.remote.updateRemotePath(cwd)
+            if connect_res.startswith('220'):
+                user_res = self.ftp.USER(username)
+                self.log(user_res)
 
-            self.hostEdit.setDisabled(True)
-            self.userEdit.setDisabled(True)
-            self.passwordEdit.setDisabled(True)
-            self.portEdit.setDisabled(True)
+                if user_res.startswith('331'):
+                    pass_res = self.ftp.PASS(password)
+                    self.log(pass_res)
+
+                    if pass_res.startswith('230'):
+                        syst_res = self.ftp.PASS(password)
+                        self.log(syst_res)
+                        type_res = self.ftp.TYPE()
+                        self.log(type_res)
+
+                        if type_res.startswith('200'):
+                            pwd_res = self.ftp.PWD()
+                            self.log(pwd_res)
+                            cwd = re.search('\".*\"', pwd_res).group()[1:-1]
+
+                            self.connected = True
+                            self.remote.cwd = cwd
+                            self.remote.updateRemotePath(cwd)
+
+                            self.hostEdit.setDisabled(True)
+                            self.userEdit.setDisabled(True)
+                            self.passwordEdit.setDisabled(True)
+                            self.portEdit.setDisabled(True)
+
+                if not self.connected:
+                    self.log(self.ftp.QUIT())
         else:
-            self.log(self.ftp.QUIT())
-            self.remote.pathEditSetText('')
-            self.remote.files.clear()
+            quit_res = self.ftp.QUIT()
+            self.log(quit_res)
+            if quit_res.startswith('221'):
+                self.connected = False
+                self.remote.pathEditSetText('')
+                self.remote.files.clear()
 
-            self.hostEdit.setDisabled(False)
-            self.userEdit.setDisabled(False)
-            self.passwordEdit.setDisabled(False)
-            self.portEdit.setDisabled(False)
+                self.hostEdit.setDisabled(False)
+                self.userEdit.setDisabled(False)
+                self.passwordEdit.setDisabled(False)
+                self.portEdit.setDisabled(False)
+                for b in self.all_buttons:
+                    b.setHidden(True)
+                    b.setDisabled(True)
+                    b.setHidden(False)
 
-        self.connected = not self.connected
         self.connectButton.setText(
             'Connect' if not self.connected else 'Disconnect')
+
+    def selectedFileChanged(self):
+
+        def setButtonDisabled(b, disable):
+            b.setHidden(True)
+            b.setDisabled(disable)
+            b.setHidden(False)
+
+        if self.connected and self.local.selectedIsFile():
+            setButtonDisabled(self.local.upload_button, False)
+        else:
+            setButtonDisabled(self.local.upload_button, True)
+
+        if self.connected and self.remote.selectedIsFile():
+            setButtonDisabled(self.remote.download_button, False)
+        else:
+            setButtonDisabled(self.remote.download_button, True)
+
+        if self.connected and self.local.selectedIsFile() and self.remote.selectedIsFile():
+            setButtonDisabled(self.local.cont_upload_button, False)
+            setButtonDisabled(self.remote.cont_download_button, False)
+        else:
+            setButtonDisabled(self.local.cont_upload_button, True)
+            setButtonDisabled(self.remote.cont_download_button, True)
+
+        if self.connected:
+            setButtonDisabled(self.remote.mkd_button, False)
+        else:
+            setButtonDisabled(self.remote.mkd_button, True)
+
+        if self.connected and self.remote.files.currentItem() is not None and self.remote.files.currentItem().text(0) != '..':
+            setButtonDisabled(self.remote.rename_button, False)
+            setButtonDisabled(self.remote.rmd_button, False)
+        else:
+            setButtonDisabled(self.remote.rename_button, True)
+            setButtonDisabled(self.remote.rmd_button, True)
+
+    # -------------- Data Transimission ---------------
 
     def clone_ftp_connection(self):
         ftp = FTPClient()
@@ -432,6 +558,9 @@ class MainWindow(QWidget):
         return ftp
 
     def download(self):
+        if self.remote.files.currentItem() is None:
+            return
+
         filename = self.remote.files.currentItem().text(0)
         filesize = int(self.remote.files.currentItem().text(1))
         remote_dir = self.remote.cwd
@@ -469,6 +598,9 @@ class MainWindow(QWidget):
         downloadThread.start()
 
     def cont_download(self):
+        if self.remote.files.currentItem() is None or self.local.files.currentItem() is None:
+            return
+
         if self.remote.files.currentItem().text(0) != self.local.files.currentItem().text(0):
             if not confirmDialog('Continue to Download', 'Filename not Same. Sure?', parent=self):
                 return
@@ -513,6 +645,9 @@ class MainWindow(QWidget):
         downloadThread.start()
 
     def upload(self):
+        if self.local.files.currentItem() is None:
+            return
+
         filename = self.local.files.currentItem().text(0)
         filesize = int(self.local.files.currentItem().text(1))
         remote_dir = self.remote.cwd
@@ -536,7 +671,10 @@ class MainWindow(QWidget):
         uploadThread.responseGet.connect(lambda x: self.log(x))
 
         def modify_item(x):
-            item.setText(4, ('%.2f' % (x/filesize*100)) + '%')
+            if filesize != 0:
+                item.setText(4, ('%.2f' % (x/filesize*100)) + '%')
+            else:
+                item.setText(4, '100%')
             item.setText(5, 'Uploading')
         uploadThread.dataProgress.connect(modify_item)
 
@@ -547,8 +685,11 @@ class MainWindow(QWidget):
         uploadThread.start()
 
     def cont_upload(self):
+        if self.remote.files.currentItem() is None or self.local.files.currentItem() is None:
+            return
+
         if self.remote.files.currentItem().text(0) != self.local.files.currentItem().text(0):
-            if not confirmDialog('Continue to Download', 'Filename not Same. Sure?', parent=self):
+            if not confirmDialog('Continue to Upload', 'Filename not Same. Sure?', parent=self):
                 return
 
         filename = self.local.files.currentItem().text(0)
@@ -576,7 +717,10 @@ class MainWindow(QWidget):
         uploadThread.responseGet.connect(lambda x: self.log(x))
 
         def modify_item(x):
-            item.setText(4, ('%.2f' % ((x+rest)/filesize*100)) + '%')
+            if filesize != 0:
+                item.setText(4, ('%.2f' % ((x+rest)/filesize*100)) + '%')
+            else:
+                item.setText(4, '100%')
             item.setText(5, 'Uploading')
         uploadThread.dataProgress.connect(modify_item)
 
@@ -586,7 +730,7 @@ class MainWindow(QWidget):
         uploadThread.finish.connect(uploadDone)
         uploadThread.start()
 
-    # GUI
+    # --------------------- GUI -----------------------
 
     def createGui(self):
         self.mainLayout = QtWidgets.QVBoxLayout()
