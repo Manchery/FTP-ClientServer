@@ -413,9 +413,9 @@ class MainWindow(QWidget):
             b.setDisabled(True)
 
         # debug
-        self.hostEdit.setText('59.66.136.21')
-        self.userEdit.setText('ssast')
-        self.passwordEdit.setText('ssast')
+        # self.hostEdit.setText('59.66.136.21')
+        # self.userEdit.setText('ssast')
+        # self.passwordEdit.setText('ssast')
 
         # self.hostEdit.setText('192.168.98.132')
         # self.userEdit.setText('anonymous')
@@ -483,7 +483,7 @@ class MainWindow(QWidget):
                         self.log(pass_res)
 
                         if pass_res.startswith('230'):
-                            syst_res = self.ftp.PASS(password)
+                            syst_res = self.ftp.SYST()
                             self.log(syst_res)
                             type_res = self.ftp.TYPE()
                             self.log(type_res)
