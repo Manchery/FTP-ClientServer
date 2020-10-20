@@ -43,6 +43,8 @@ class DownloadThread(AbstractDataThread):
             self.ftp.REST(self.rest)
 
         self.ftp.RETR(self.remote_file, self.local_file, self.rest != 0)
+        self.ftp.QUIT()
+        self.ftp.close_connect_socket()
         self.finish.emit()
 
 
@@ -57,6 +59,8 @@ class UploadThread(AbstractDataThread):
 
         self.ftp.STOR(self.remote_file, self.local_file,
                       self.rest != 0, self.rest)
+        self.ftp.QUIT()
+        self.ftp.close_connect_socket()
         self.finish.emit()
 
 
@@ -428,7 +432,10 @@ class MainWindow(QWidget):
         for l in log_str.strip().split('\n'):
             if len(l) == 0:
                 continue
-            color = self.COLORS.get(l[0], 'black')
+            if l.startswith('[Client Error]'):
+                color = 'darkRed'
+            else:
+                color = self.COLORS.get(l[0], 'black')
             s = '%s <font color="%s">%s</font>' % (time.strftime(
                 "%Y-%m-%d %H:%M:%S", time.localtime()), color, l)
             self.messages.append(s)
@@ -453,43 +460,49 @@ class MainWindow(QWidget):
             password = self.passwordEdit.text()
             port = int(self.portEdit.text())
 
-            connect_res = self.ftp.open_connect_socket(host, port)
-            self.log(connect_res)
+            try:
+                connect_res = self.ftp.open_connect_socket(host, port)
+                self.log(connect_res)
+            except:
+                self.ftp.close_connect_socket()
+                self.log("[Client Error] Network is unreachable.")
+            else:
+                if connect_res.startswith('220'):
+                    user_res = self.ftp.USER(username)
+                    self.log(user_res)
 
-            if connect_res.startswith('220'):
-                user_res = self.ftp.USER(username)
-                self.log(user_res)
+                    if user_res.startswith('331'):
+                        pass_res = self.ftp.PASS(password)
+                        self.log(pass_res)
 
-                if user_res.startswith('331'):
-                    pass_res = self.ftp.PASS(password)
-                    self.log(pass_res)
+                        if pass_res.startswith('230'):
+                            syst_res = self.ftp.PASS(password)
+                            self.log(syst_res)
+                            type_res = self.ftp.TYPE()
+                            self.log(type_res)
 
-                    if pass_res.startswith('230'):
-                        syst_res = self.ftp.PASS(password)
-                        self.log(syst_res)
-                        type_res = self.ftp.TYPE()
-                        self.log(type_res)
+                            if type_res.startswith('200'):
+                                pwd_res = self.ftp.PWD()
+                                self.log(pwd_res)
+                                cwd = re.search(
+                                    '\".*\"', pwd_res).group()[1:-1]
 
-                        if type_res.startswith('200'):
-                            pwd_res = self.ftp.PWD()
-                            self.log(pwd_res)
-                            cwd = re.search('\".*\"', pwd_res).group()[1:-1]
+                                self.connected = True
+                                self.remote.cwd = cwd
+                                self.remote.updateRemotePath(cwd)
 
-                            self.connected = True
-                            self.remote.cwd = cwd
-                            self.remote.updateRemotePath(cwd)
+                                self.hostEdit.setDisabled(True)
+                                self.userEdit.setDisabled(True)
+                                self.passwordEdit.setDisabled(True)
+                                self.portEdit.setDisabled(True)
 
-                            self.hostEdit.setDisabled(True)
-                            self.userEdit.setDisabled(True)
-                            self.passwordEdit.setDisabled(True)
-                            self.portEdit.setDisabled(True)
-
-                if not self.connected:
-                    self.log(self.ftp.QUIT())
+                    if not self.connected:
+                        self.log(self.ftp.QUIT())
         else:
             quit_res = self.ftp.QUIT()
             self.log(quit_res)
             if quit_res.startswith('221'):
+                self.ftp.close_connect_socket()
                 self.connected = False
                 self.remote.pathEditSetText('')
                 self.remote.files.clear()
@@ -551,11 +564,16 @@ class MainWindow(QWidget):
         port = int(self.portEdit.text())
         username = self.userEdit.text()
         password = self.passwordEdit.text()
-        ftp.open_connect_socket(host, port)
-        ftp.USER(username)
-        ftp.PASS(password)
-        ftp.TYPE()
-        return ftp
+        try:
+            ftp.open_connect_socket(host, port)
+        except:
+            self.log("[Client Error] Network is unreachable.")
+            return None
+        else:
+            ftp.USER(username)
+            ftp.PASS(password)
+            ftp.TYPE()
+            return ftp
 
     def download(self):
         if self.remote.files.currentItem() is None:
@@ -570,6 +588,8 @@ class MainWindow(QWidget):
         local_file = os.path.join(local_dir, filename)
 
         d_ftp = self.clone_ftp_connection()
+        if d_ftp is None:
+            return
 
         item = QTreeWidgetItem()
         item.setText(0, 'remote -> local')
@@ -616,6 +636,8 @@ class MainWindow(QWidget):
             local_dir, self.local.files.currentItem().text(0))
 
         d_ftp = self.clone_ftp_connection()
+        if d_ftp is None:
+            return
 
         item = QTreeWidgetItem()
         item.setText(0, 'remote -> local')
@@ -657,6 +679,8 @@ class MainWindow(QWidget):
         local_file = os.path.join(local_dir, filename)
 
         u_ftp = self.clone_ftp_connection()
+        if u_ftp is None:
+            return
 
         item = QTreeWidgetItem()
         item.setText(0, 'local -> remote')
@@ -703,6 +727,8 @@ class MainWindow(QWidget):
         local_file = os.path.join(local_dir, filename)
 
         u_ftp = self.clone_ftp_connection()
+        if u_ftp is None:
+            return
 
         item = QTreeWidgetItem()
         item.setText(0, 'local -> remote')

@@ -96,6 +96,11 @@ class FTPClient(QObject):
         else:
             return ''
 
+    def close_connect_socket(self):
+        if self.connect_socket is not None:
+            self.connect_socket.close()
+            self.connect_socket = None
+
     def USER(self, username):
         req = ('USER %s\r\n' % username).encode()
         self.connect_socket.sendall(req)
@@ -112,10 +117,6 @@ class FTPClient(QObject):
         req = 'QUIT\r\n'.encode()
         self.connect_socket.sendall(req)
         res = self.connect_socket_receive()
-
-        self.connect_socket.close()
-        self.connect_socket = None
-
         return res
 
     def SYST(self):
