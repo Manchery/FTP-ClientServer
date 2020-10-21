@@ -36,7 +36,7 @@ int main(int argc, char **argv)
     SocketFD = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (SocketFD == -1)
     {
-        perror("cannot create socket");
+        // perror("cannot create socket");
         exit(EXIT_FAILURE);
     }
 
@@ -47,18 +47,18 @@ int main(int argc, char **argv)
     sa.sin_addr.s_addr = htonl(INADDR_ANY);
 
     int reuse = 1;
-    setsockopt(SocketFD, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof reuse);
+    setsockopt(SocketFD, SOL_SOCKET, SO_REUSEPORT, &reuse, sizeof reuse);
 
     if (bind(SocketFD, (struct sockaddr *)&sa, sizeof sa) == -1)
     {
-        perror("bind failed");
+        // perror("bind failed");
         close(SocketFD);
         exit(EXIT_FAILURE);
     }
 
     if (listen(SocketFD, 10) == -1)
     {
-        perror("listen failed");
+        // perror("listen failed");
         close(SocketFD);
         exit(EXIT_FAILURE);
     }
@@ -71,7 +71,7 @@ int main(int argc, char **argv)
 
         if (0 > ConnectFD)
         {
-            perror("accept failed");
+            // perror("accept failed");
             close(SocketFD);
             exit(EXIT_FAILURE);
         }

@@ -88,7 +88,7 @@ void *connection(void *arg)
         buffer_len = read(ConnectFD, buffer, BUFFER_SIZE);
         if (buffer_len < 0)
         {
-            perror("error read()");
+            // perror("error read()");
             break;
         }
         if (buffer_len == 0)
@@ -118,13 +118,13 @@ void *connection(void *arg)
             if (connect.verb_idx == -1)
             {
                 write_message(ConnectFD, MSG_500_CMD_INVALID);
-                perror("invalid verb");
+                // perror("invalid verb");
                 // break;
             }
             if (VERB_REQUIRE_PARAM[connect.verb_idx] && !connect.param)
             {
                 write_message(ConnectFD, MSG_501_PARAM_INVALID);
-                perror("request need a parameter");
+                // perror("request need a parameter");
                 // break;
             }
 

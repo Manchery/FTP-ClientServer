@@ -151,7 +151,7 @@ int PASV(struct ConnectionData *connect)
     connect->data_address.sin_addr.s_addr = htonl(INADDR_ANY);
 
     int reuse = 1;
-    setsockopt(connect->dataSocketFD, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof reuse);
+    setsockopt(connect->dataSocketFD, SOL_SOCKET, SO_REUSEPORT, &reuse, sizeof reuse);
 
     bind(connect->dataSocketFD, (struct sockaddr *)&(connect->data_address), sizeof(connect->data_address));
     listen(connect->dataSocketFD, 1);
@@ -192,13 +192,13 @@ static int open_data_connection(struct ConnectionData *_connect)
 
         if (_connect->dataConnectFD == -1)
         {
-            perror("cannot create socket");
+            // perror("cannot create socket");
             write_message(_connect->ConnectFD, MSG_425_NO_DATA_CONN);
             return 0;
         }
         if (connect(_connect->dataConnectFD, (struct sockaddr *)&(_connect->data_address), sizeof(_connect->data_address)) == -1)
         {
-            perror("connect failed");
+            // perror("connect failed");
             close(_connect->dataConnectFD);
             write_message(_connect->ConnectFD, MSG_425_NO_DATA_CONN);
             return 0;
