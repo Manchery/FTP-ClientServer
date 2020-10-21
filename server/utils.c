@@ -59,6 +59,8 @@ static int pop_path(char *source)
     if (strlen(source) == 1 && source[0] == '/')
         return 0;
     int p = strlen(source) - 1;
+    if (source[p] == '/') // end with '/'
+        source[p--] = 0;
     while (source[p] != '/')
         source[p--] = 0;
     return 1;
