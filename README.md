@@ -11,7 +11,7 @@ Course project for Computer Networks, instructed by [Prof. Yang](http://tns.thss
 For details, please see my report (in Chinese).
 
 <p align="center">
-  <img src="figures/client.png" alt="client-demo" width="800px" />
+  <img src="figures/client.png" alt="client-demo" width="600px" />
 </p>
 
 ## Server
